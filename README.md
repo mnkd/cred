@@ -5,7 +5,8 @@ GitHub CLI (`gh`) の credential 管理アーキテクチャに着想を得て�
 
 ## 特徴
 
-- **セッション管理不要**: OS キーリング（macOS Keychain / Linux Secret Service / Windows Credential Manager）を使用するため、`op signin` のような再認証が不要
+- **セッション管理不要**: macOS Keychain を使用するため、`op signin` のような再認証が不要
+- **macOS 専用**: ローカル開発環境（macOS）に特化
 - **namespace で整理**: プロジェクトや環境ごとに credential をグルーピング
 - **env 注入**: `cred run -- python app.py` で環境変数として自動注入
 - **.env インポート**: 既存の `.env` ファイルから一括移行
