@@ -10,6 +10,7 @@ import (
 	"github.com/mitsuru/cred/internal/config"
 	"github.com/mitsuru/cred/internal/keyring"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var setDescription string
@@ -48,15 +49,14 @@ Examples:
 				value = args[1]
 			}
 		} else {
-			// Prompt for value (read from terminal)
+			// セキュアプロンプト: 入力値を画面に表示しない
 			fmt.Fprintf(os.Stderr, "Enter value for %s: ", key)
-			scanner := bufio.NewScanner(os.Stdin)
-			if scanner.Scan() {
-				value = strings.TrimSpace(scanner.Text())
-			}
-			if err := scanner.Err(); err != nil {
+			bytesValue, err := term.ReadPassword(int(os.Stdin.Fd()))
+			fmt.Fprintln(os.Stderr)
+			if err != nil {
 				return fmt.Errorf("failed to read input: %w", err)
 			}
+			value = strings.TrimSpace(string(bytesValue))
 		}
 
 		if value == "" {
