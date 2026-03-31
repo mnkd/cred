@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mitsuru/cred/internal/config"
+	"github.com/mitsuru/cred/internal/keyring"
 	"github.com/spf13/cobra"
 )
 
@@ -92,10 +95,74 @@ var nsDefaultCmd = &cobra.Command{
 	},
 }
 
+var nsForce bool
+
+var nsDeleteCmd = &cobra.Command{
+	Use:   "delete NAME",
+	Short: "Delete a namespace and all its credentials",
+	Long: `Delete a namespace, removing all its credentials from the keyring
+and metadata from config.
+
+Examples:
+  cred ns delete work
+  cred ns delete staging --force    # Skip confirmation`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		name := args[0]
+
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
+
+		// デフォルト namespace の削除を禁止
+		if name == cfg.ActiveNamespace("") {
+			return fmt.Errorf("cannot delete the default namespace %q", name)
+		}
+
+		nsConfig, exists := cfg.Namespaces[name]
+		if !exists {
+			return fmt.Errorf("namespace %q does not exist", name)
+		}
+
+		// 確認プロンプト
+		if !nsForce {
+			fmt.Fprintf(os.Stderr, "Delete namespace %q and its %d credential(s)? [y/N] ", name, len(nsConfig.Keys))
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+				if answer != "y" && answer != "yes" {
+					fmt.Fprintln(os.Stderr, "Cancelled")
+					return nil
+				}
+			}
+		}
+
+		// キーリングからエントリを削除
+		service := keyring.ServiceName(name)
+		for key := range nsConfig.Keys {
+			if err := keyring.Delete(service, key); err != nil {
+				fmt.Fprintf(os.Stderr, "⚠ Failed to delete %s from keyring: %v\n", key, err)
+			}
+		}
+
+		// 設定ファイルから namespace を削除
+		delete(cfg.Namespaces, name)
+		if err := cfg.Save(); err != nil {
+			return err
+		}
+
+		fmt.Fprintf(os.Stderr, "✓ Deleted namespace %q\n", name)
+		return nil
+	},
+}
+
 func init() {
 	nsCreateCmd.Flags().StringP("description", "d", "", "namespace description")
+	nsDeleteCmd.Flags().BoolVar(&nsForce, "force", false, "skip confirmation prompt")
 	nsCmd.AddCommand(nsListCmd)
 	nsCmd.AddCommand(nsCreateCmd)
 	nsCmd.AddCommand(nsDefaultCmd)
+	nsCmd.AddCommand(nsDeleteCmd)
 	rootCmd.AddCommand(nsCmd)
 }
