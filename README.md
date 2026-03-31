@@ -120,6 +120,35 @@ cred import .env --dry-run
 cred import .env --overwrite
 ```
 
+### `cred export` — .env 形式でエクスポート
+
+```bash
+# 現在の namespace の全キーを .env 形式で stdout に出力
+cred export
+
+# ファイルに保存
+cred export > .env.local
+
+# 特定の namespace からエクスポート
+cred export -n production
+
+# 特定のキーだけ出力
+cred export --keys OPENAI_API_KEY,DB_PASSWORD
+```
+
+### `cred edit` — エディタでシークレットを編集
+
+```bash
+# $EDITOR（デフォルト: vi）で値を編集
+cred edit OPENAI_API_KEY
+
+# エディタを指定
+EDITOR=code cred edit CONFIG_JSON
+
+# 特定の namespace のキーを編集
+cred edit DB_PASSWORD -n production
+```
+
 ### `cred run` — 環境変数を注入してコマンド実行
 
 ```bash
@@ -156,6 +185,12 @@ cred ns default
 # デフォルト namespace を切り替え
 cred ns default work
 
+# namespace を削除（確認プロンプトあり）
+cred ns delete work
+
+# 確認をスキップして削除
+cred ns delete staging --force
+
 # namespace を切り替えながら操作
 cred set API_KEY -n work
 cred get API_KEY -n work
@@ -181,6 +216,33 @@ gh secret set OPENAI_API_KEY --body "$(cred get OPENAI_API_KEY)"
 cred import .env --dry-run   # まずプレビュー
 cred import .env              # インポート実行
 rm .env                       # 元ファイルを削除
+```
+
+### `cred doctor` — 環境診断
+
+```bash
+# キーリングの可用性、設定ファイル、整合性をチェック
+cred doctor
+# ✓ Keyring: accessible
+# ✓ Config: ~/.config/cred/config.yml
+# ✓ default/OPENAI_API_KEY
+# ⚠ default/OLD_KEY: in config but not in keyring
+```
+
+### `--format json` — JSON 出力
+
+```bash
+# cred get の JSON 出力
+cred get OPENAI_API_KEY --format json
+# {"key":"OPENAI_API_KEY","value":"sk-xxx"}
+
+# cred list の JSON 出力
+cred list --format json
+# [{"key":"OPENAI_API_KEY","env_var":"OPENAI_API_KEY","description":"..."}]
+
+# cred ns list の JSON 出力
+cred ns list --format json
+# [{"name":"default","default":true,"key_count":3}]
 ```
 
 ## 設定ファイル
@@ -221,7 +283,10 @@ cred
 │   ├── list.go                   # cred list
 │   ├── run.go                    # cred run -- COMMAND
 │   ├── import.go                 # cred import .env
-│   └── namespace.go              # cred ns {list,create,default}
+│   ├── export.go                 # cred export
+│   ├── edit.go                   # cred edit
+│   ├── doctor.go                 # cred doctor
+│   └── namespace.go              # cred ns {list,create,default,delete}
 └── internal/
     ├── keyring/
     │   └── keyring.go            # OS キーリングラッパー（3秒タイムアウト）
@@ -248,12 +313,15 @@ secret:  "{actual_value}"      (例: "sk-xxxxxxxxxxxx")
 | 用途 | GitHub トークン専用 | 汎用（任意の API Key） |
 | env 注入 | なし | `cred run` で対応 |
 | .env インポート | なし | `cred import` で対応 |
+| .env エクスポート | なし | `cred export` で対応 |
+| JSON 出力 | なし | `--format json` で対応 |
 
 ## 依存ライブラリ
 
 - [spf13/cobra](https://github.com/spf13/cobra) — CLI フレームワーク
 - [zalando/go-keyring](https://github.com/zalando/go-keyring) — クロスプラットフォーム キーリング
 - [go-yaml/yaml](https://github.com/go-yaml/yaml) — YAML パーサー
+- [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) — セキュアプロンプト入力
 
 ## ライセンス
 
