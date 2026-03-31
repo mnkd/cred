@@ -14,13 +14,13 @@ GitHub CLI (`gh`) の credential 管理アーキテクチャに着想を得て�
 ## インストール
 
 ```bash
-go install github.com/mitsuru/cred@latest
+go install github.com/mnkd/cred@latest
 ```
 
 または、リポジトリをクローンしてビルド:
 
 ```bash
-git clone https://github.com/mitsuru/cred.git
+git clone https://github.com/mnkd/cred.git
 cd cred
 go build -o cred .
 ```

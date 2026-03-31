@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/mitsuru/cred/internal/config"
-	"github.com/mitsuru/cred/internal/env"
-	"github.com/mitsuru/cred/internal/keyring"
+	"github.com/mnkd/cred/internal/config"
+	"github.com/mnkd/cred/internal/env"
+	"github.com/mnkd/cred/internal/keyring"
 	"github.com/spf13/cobra"
 )
 

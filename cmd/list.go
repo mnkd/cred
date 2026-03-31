@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/mitsuru/cred/internal/config"
+	"github.com/mnkd/cred/internal/config"
 	"github.com/spf13/cobra"
 )
 

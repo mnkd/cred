@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mitsuru/cred/internal/config"
-	"github.com/mitsuru/cred/internal/keyring"
+	"github.com/mnkd/cred/internal/config"
+	"github.com/mnkd/cred/internal/keyring"
 	"github.com/spf13/cobra"
 )
 

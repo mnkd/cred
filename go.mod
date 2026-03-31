@@ -1,4 +1,4 @@
-module github.com/mitsuru/cred
+module github.com/mnkd/cred
 
 go 1.25.0
 

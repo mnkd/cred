@@ -14,3 +14,9 @@ cred
 # Environment
 .env
 .env.*
+
+# Claude Code
+.claude/
+
+# Handoff (作業用)
+HANDOFF.md
