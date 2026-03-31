@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -45,7 +46,12 @@ Examples:
 			return fmt.Errorf("failed to retrieve from keyring: %w", err)
 		}
 
-		// Print to stdout without newline (safe for $() substitution)
+		if isJSON() {
+			out := map[string]string{"key": key, "value": value}
+			return json.NewEncoder(os.Stdout).Encode(out)
+		}
+
+		// テキスト出力: 末尾改行なし（$() 置換で安全）
 		fmt.Fprint(os.Stdout, value)
 		return nil
 	},
