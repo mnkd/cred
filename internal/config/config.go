@@ -81,6 +81,15 @@ func Load() (*Config, error) {
 		cfg.Namespaces = make(map[string]Namespace)
 	}
 
+	// スキーマバージョンが古い場合はマイグレーションを実行
+	if migrated, err := Migrate(&cfg); err != nil {
+		return nil, fmt.Errorf("config migration failed: %w", err)
+	} else if migrated {
+		if err := cfg.Save(); err != nil {
+			return nil, fmt.Errorf("failed to save migrated config: %w", err)
+		}
+	}
+
 	return &cfg, nil
 }
 
