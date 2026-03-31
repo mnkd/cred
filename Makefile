@@ -1,12 +1,14 @@
 BINARY := cred
-MODULE := github.com/mitsuru/cred
 
-.PHONY: all build clean test lint fmt tidy help
+.PHONY: all build install clean test lint fmt tidy help
 
 all: build
 
 build: tidy
 	go build -o $(BINARY) .
+
+install: tidy
+	go install .
 
 clean:
 	rm -f $(BINARY)
@@ -25,9 +27,10 @@ tidy:
 
 help:
 	@echo "Usage:"
-	@echo "  make build  - ビルド (go mod tidy + go build)"
-	@echo "  make test   - テスト実行"
-	@echo "  make lint   - go vet 実行"
-	@echo "  make fmt    - gofmt でフォーマット"
-	@echo "  make tidy   - go mod tidy 実行"
-	@echo "  make clean  - バイナリ削除"
+	@echo "  make build   - Build binary (go mod tidy + go build)"
+	@echo "  make install - Install to GOPATH/bin (go install)"
+	@echo "  make test    - Run tests"
+	@echo "  make lint    - Run go vet"
+	@echo "  make fmt     - Run gofmt"
+	@echo "  make tidy    - Run go mod tidy"
+	@echo "  make clean   - Remove binary"
