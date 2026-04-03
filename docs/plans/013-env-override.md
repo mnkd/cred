@@ -1,21 +1,28 @@
 # 013: Standardize env var override behavior
 
+## Decision
+
+ADR-003: Always overwrite existing environment variables (envchain/aws-vault approach).
+
 ## Problem
 
 `cmd/run.go` appends credentials to the environ slice via `append()`.
 When a variable with the same name already exists, both entries coexist
 and which value wins is OS/runtime-dependent.
 
-Tools like envchain (`setenv(overwrite=1)`) and aws-vault explicitly
-overwrite existing variables to guarantee deterministic behavior.
-
 ## Solution
 
-Replace the `append` call with a helper that scans the existing environ
-slice for a matching `KEY=` prefix. If found, overwrite in place;
-otherwise append.
+Add a `setEnv` helper that scans the environ slice for a matching
+`KEY=` prefix. If found, overwrite in place; otherwise append.
 
-## Files
+## Tasks
 
-- `cmd/run.go` — use `setEnv` helper instead of raw `append`
-- `cmd/run_test.go` — add tests for overwrite and append cases
+1. [ ] Add `setEnv(environ []string, key, value string) []string` helper in `cmd/run.go`
+2. [ ] Add unit tests for `setEnv` in `cmd/run_helper_test.go`
+   - Overwrite: existing `KEY=old` is replaced with `KEY=new`
+   - Append: new key is added when not present
+   - Prefix safety: `API_KEY_V2` is not matched by `API_KEY`
+   - Empty value: `KEY=` is handled correctly
+3. [ ] Replace `append(environ, envVar+"="+value)` with `setEnv(environ, envVar, value)` in `cmd/run.go`
+4. [ ] Run `make test` to confirm all tests pass
+5. [ ] Update `docs/research/injection-and-security-comparison.md` to reflect the change
