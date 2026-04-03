@@ -17,12 +17,12 @@ Add a `setEnv` helper that scans the environ slice for a matching
 
 ## Tasks
 
-1. [ ] Add `setEnv(environ []string, key, value string) []string` helper in `cmd/run.go`
-2. [ ] Add unit tests for `setEnv` in `cmd/run_helper_test.go`
+1. [x] Add `setEnv(environ []string, key, value string) []string` helper in `cmd/environ.go`
+2. [x] Add unit tests for `setEnv` in `cmd/environ_test.go`
    - Overwrite: existing `KEY=old` is replaced with `KEY=new`
    - Append: new key is added when not present
    - Prefix safety: `API_KEY_V2` is not matched by `API_KEY`
    - Empty value: `KEY=` is handled correctly
-3. [ ] Replace `append(environ, envVar+"="+value)` with `setEnv(environ, envVar, value)` in `cmd/run.go`
-4. [ ] Run `make test` to confirm all tests pass
-5. [ ] Update `docs/research/injection-and-security-comparison.md` to reflect the change
+3. [x] Replace `append(environ, envVar+"="+value)` with `setEnv(environ, envVar, value)` in `cmd/run.go`
+4. [x] Run tests to confirm all tests pass
+5. [x] Update `docs/research/injection-and-security-comparison.md` to reflect the change
