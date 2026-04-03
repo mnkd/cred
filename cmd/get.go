@@ -51,7 +51,7 @@ Examples:
 			return json.NewEncoder(os.Stdout).Encode(out)
 		}
 
-		// テキスト出力: 末尾改行なし（$() 置換で安全）
+		// Text output: no trailing newline (safe for $() substitution)
 		fmt.Fprint(os.Stdout, value)
 		return nil
 	},

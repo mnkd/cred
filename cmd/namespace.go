@@ -136,7 +136,7 @@ Examples:
 			return err
 		}
 
-		// デフォルト namespace の削除を禁止
+		// Prevent deletion of the default namespace
 		if name == cfg.ActiveNamespace("") {
 			return fmt.Errorf("cannot delete the default namespace %q", name)
 		}
@@ -146,7 +146,7 @@ Examples:
 			return fmt.Errorf("namespace %q does not exist", name)
 		}
 
-		// 確認プロンプト
+		// Confirmation prompt
 		if !nsForce {
 			fmt.Fprintf(os.Stderr, "Delete namespace %q and its %d credential(s)? [y/N] ", name, len(nsConfig.Keys))
 			scanner := bufio.NewScanner(os.Stdin)
@@ -159,7 +159,7 @@ Examples:
 			}
 		}
 
-		// キーリングからエントリを削除
+		// Delete entries from keyring
 		service := keyring.ServiceName(name)
 		for key := range nsConfig.Keys {
 			if err := keyring.Delete(service, key); err != nil {
@@ -167,7 +167,7 @@ Examples:
 			}
 		}
 
-		// 設定ファイルから namespace を削除
+		// Delete namespace from config file
 		delete(cfg.Namespaces, name)
 		if err := cfg.Save(); err != nil {
 			return err

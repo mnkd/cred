@@ -134,7 +134,7 @@ func listJSON(cfg *config.Config) error {
 	return json.NewEncoder(os.Stdout).Encode(entries)
 }
 
-// staleWarning は更新日時が閾値を超えている場合に警告文字列を返す。
+// staleWarning returns a warning string if the updated_at timestamp exceeds the stale threshold.
 func staleWarning(updatedAt string) string {
 	if updatedAt == "" {
 		return ""
@@ -146,7 +146,7 @@ func staleWarning(updatedAt string) string {
 	age := time.Since(t)
 	if age > staleThreshold {
 		days := int(age.Hours() / 24)
-		return fmt.Sprintf(" ⚠ %d日未更新", days)
+		return fmt.Sprintf(" ⚠ %d days since last update", days)
 	}
 	return ""
 }

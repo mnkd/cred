@@ -1,6 +1,6 @@
 # cred
 
-OS キーリング（macOS Keychain）で API Key 等のシークレットを一元管理する Go CLI ツール。
+A Go CLI tool for centrally managing API keys and other secrets via the OS keyring (macOS Keychain).
 
 ## Build & Test
 
@@ -12,21 +12,22 @@ make install     # go install .
 
 ## Architecture
 
-- `cmd/` — cobra サブコマンド
-- `internal/keyring/` — zalando/go-keyring のタイムアウトラッパー
-- `internal/config/` — ~/.config/cred/config.yml の読み書き
-- `internal/env/` — .env ファイルパーサー
+- `cmd/` — cobra subcommands
+- `internal/keyring/` — timeout wrapper for zalando/go-keyring
+- `internal/config/` — read/write ~/.config/cred/config.yml
+- `internal/env/` — .env file parser
 
 ## Coding Rules
 
-- macOS 専用。Windows / Linux 対応は不要
-- シークレットの値は設定ファイルに書かない（OS キーリングにのみ保存）
-- ユーザー向けメッセージは `os.Stderr` に出力（`os.Stdout` はデータ出力専用）
-- エラーは `fmt.Errorf("context: %w", err)` でラップ
+- macOS only. No Windows / Linux support needed
+- Never store secret values in config files (store only in OS keyring)
+- User-facing messages go to `os.Stderr` (`os.Stdout` is reserved for data output)
+- Wrap errors with `fmt.Errorf("context: %w", err)`
+- All code comments, commit messages, and documentation must be written in English
 
 ## Workflow
 
-- 作業開始時は docs/plans/ にプランを作成してから実装する
-- TDD の流れで実装する: テストを先に書く → 失敗を確認 → 実装 → テストが通ることを確認
-- コード変更後は README.md の更新が必要か確認し、必要なら更新する
-  - 対象: 使い方、アーキテクチャ図、比較表、依存ライブラリ
+- Create a plan in docs/plans/ before starting implementation
+- Follow TDD: write tests first -> confirm failure -> implement -> confirm tests pass
+- After code changes, check whether README.md needs updating
+  - Targets: usage, architecture diagram, comparison table, dependencies

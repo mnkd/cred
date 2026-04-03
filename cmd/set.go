@@ -49,7 +49,7 @@ Examples:
 				value = args[1]
 			}
 		} else {
-			// セキュアプロンプト: 入力値を画面に表示しない
+			// Secure prompt: hide input from display
 			fmt.Fprintf(os.Stderr, "Enter value for %s: ", key)
 			bytesValue, err := term.ReadPassword(int(os.Stdin.Fd()))
 			fmt.Fprintln(os.Stderr)

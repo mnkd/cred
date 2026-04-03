@@ -81,7 +81,7 @@ func TestEnsureNamespace(t *testing.T) {
 		t.Fatal("namespace 'work' not created")
 	}
 
-	// 二重呼び出しでも上書きされない
+	// Double call should not overwrite existing data
 	cfg.SetKeyMeta("work", "KEY", KeyMeta{EnvVar: "KEY"})
 	cfg.EnsureNamespace("work")
 	if _, ok := cfg.Namespaces["work"].Keys["KEY"]; !ok {
@@ -105,24 +105,24 @@ func TestSetKeyMeta_And_DeleteKeyMeta(t *testing.T) {
 
 func TestDeleteKeyMeta_NonexistentNamespace(t *testing.T) {
 	cfg := defaultConfig()
-	// パニックしないことを確認
+	// Should not panic
 	cfg.DeleteKeyMeta("nonexistent", "KEY")
 }
 
 func TestActiveNamespace(t *testing.T) {
 	cfg := defaultConfig()
 
-	// オーバーライドが優先
+	// Override takes precedence
 	if got := cfg.ActiveNamespace("work"); got != "work" {
 		t.Errorf("got %q, want %q", got, "work")
 	}
 
-	// デフォルト
+	// Default
 	if got := cfg.ActiveNamespace(""); got != "default" {
 		t.Errorf("got %q, want %q", got, "default")
 	}
 
-	// config のデフォルト変更
+	// Change config default
 	cfg.Default = "production"
 	if got := cfg.ActiveNamespace(""); got != "production" {
 		t.Errorf("got %q, want %q", got, "production")

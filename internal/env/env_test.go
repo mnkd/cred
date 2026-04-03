@@ -70,10 +70,10 @@ func TestParseFile_ExportPrefix(t *testing.T) {
 }
 
 func TestParseFile_CommentsAndEmptyLines(t *testing.T) {
-	content := `# コメント行
+	content := `# Comment line
 FOO=bar
 
-# もうひとつコメント
+# Another comment
 
 BAZ=qux
 `

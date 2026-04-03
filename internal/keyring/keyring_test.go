@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	// テスト用のモックバックエンドを使用（実際の OS キーリングにアクセスしない）
+	// Use mock backend for testing (does not access the actual OS keyring)
 	gokeyring.MockInit()
 }
 

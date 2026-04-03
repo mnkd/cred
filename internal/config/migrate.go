@@ -2,21 +2,21 @@ package config
 
 import "fmt"
 
-// currentVersion は現在の設定ファイルスキーマバージョン
+// currentVersion is the current config file schema version.
 const currentVersion = 1
 
-// migration はバージョン N から N+1 への変換関数
+// migration is a function that converts from version N to N+1.
 type migration func(*Config) error
 
-// migrations はバージョン番号をキーとするマイグレーション関数のマップ。
-// バージョン N のマイグレーションは N → N+1 への変換を行う。
+// migrations maps version numbers to their migration functions.
+// A migration for version N converts from N to N+1.
 var migrations = map[int]migration{
-	// NOTE: 将来のスキーマ変更時にここへ追加する
-	// 例:
+	// NOTE: Add future schema migrations here
+	// e.g.:
 	// 1: migrateV1toV2,
 }
 
-// Migrate は設定ファイルのバージョンが古い場合に順次マイグレーションを実行する。
+// Migrate runs sequential migrations if the config file version is outdated.
 func Migrate(cfg *Config) (bool, error) {
 	if cfg.Version >= currentVersion {
 		return false, nil

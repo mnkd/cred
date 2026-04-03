@@ -81,7 +81,7 @@ func Load() (*Config, error) {
 		cfg.Namespaces = make(map[string]Namespace)
 	}
 
-	// スキーマバージョンが古い場合はマイグレーションを実行
+	// Run migration if schema version is outdated
 	if migrated, err := Migrate(&cfg); err != nil {
 		return nil, fmt.Errorf("config migration failed: %w", err)
 	} else if migrated {

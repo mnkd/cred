@@ -25,7 +25,7 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		hasError := false
 
-		// 1. キーリングの可用性チェック
+		// 1. Keyring availability check
 		fmt.Fprintln(os.Stderr, "Checking keyring...")
 		testService := keyring.ServiceName("__doctor_test__")
 		testKey := "__doctor_probe__"
@@ -42,11 +42,11 @@ Examples:
 			} else {
 				fmt.Fprintln(os.Stderr, "  ✓ Keyring: accessible")
 			}
-			// テストエントリを削除
+			// Clean up test entry
 			_ = keyring.Delete(testService, testKey)
 		}
 
-		// 2. 設定ファイルのチェック
+		// 2. Config file check
 		fmt.Fprintln(os.Stderr, "Checking config...")
 		configPath, err := config.ConfigPath()
 		if err != nil {
@@ -67,7 +67,7 @@ Examples:
 		} else {
 			fmt.Fprintf(os.Stderr, "  ✓ Config: version %d, %d namespace(s)\n", cfg.Version, len(cfg.Namespaces))
 
-			// 3. config と keyring の整合性チェック
+			// 3. Config and keyring consistency check
 			fmt.Fprintln(os.Stderr, "Checking consistency...")
 			for nsName, nsConfig := range cfg.Namespaces {
 				service := keyring.ServiceName(nsName)

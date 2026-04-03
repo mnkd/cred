@@ -37,7 +37,7 @@ Examples:
 			return fmt.Errorf("no credentials in namespace %q", ns)
 		}
 
-		// --keys フラグで絞り込み
+		// Filter by --keys flag
 		var filter map[string]bool
 		if exportKeys != "" {
 			filter = make(map[string]bool)

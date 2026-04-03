@@ -1,30 +1,30 @@
-# ADR-002: --insecure-storage フラグを実装しない
+# ADR-002: Do not implement --insecure-storage flag
 
-## ステータス
+## Status
 
 Accepted
 
-## コンテキスト
+## Context
 
-gh CLI には `--insecure-storage` フラグがあり、キーリングが使えない環境（ヘッドレスサーバー、CI）向けに平文ファイルへのフォールバックを提供している。cred でも同様の機能が必要か検討した。
+gh CLI has an `--insecure-storage` flag that provides a plaintext file fallback for environments where the keyring is unavailable (headless servers, CI). We considered whether cred needs a similar feature.
 
-### フォールバックの実装方針は 2 つ
+### Two approaches for fallback implementation
 
-1. **平文ファイル + ファイル権限（gh CLI 方式）**: 暗号化なし。`0600` パーミッションのみで保護
-2. **マスターパスワードで暗号化**: Argon2id で鍵導出 + AES-GCM で暗号化。毎回パスワード入力が必要
+1. **Plaintext file + file permissions (gh CLI approach)**: No encryption. Protected only by `0600` permissions
+2. **Encrypted with master password**: Key derivation via Argon2id + AES-GCM encryption. Requires password input every time
 
-## 決定
+## Decision
 
-`--insecure-storage` フラグは実装しない。
+Do not implement the `--insecure-storage` flag.
 
-## 根拠
+## Rationale
 
-- cred の想定環境はローカルマシン（MCP、スクリプト、Web 開発、Docker）に限定されており、OS キーリングが常に利用可能
-- 平文ファイル方式はディスク上にシークレットが残るリスクがある
-- 暗号化方式は毎回のパスワード入力が必要で、`op signin` が面倒という cred の開発動機と矛盾する
-- キーリングが使えない環境に遭遇するユースケースが存在しない
+- cred's target environment is limited to local machines (MCP, scripts, web development, Docker), where the OS keyring is always available
+- The plaintext file approach risks leaving secrets on disk
+- The encryption approach requires password input every time, contradicting cred's development motivation that `op signin` is inconvenient
+- There are no use cases where the keyring would be unavailable
 
-## 影響
+## Consequences
 
-- キーリングが利用できない環境では cred は動作しない（意図的な制限）
-- CI 環境でのシークレット管理は GitHub Secrets 等の専用機構を使う前提とする
+- cred does not work in environments where the keyring is unavailable (intentional limitation)
+- Secret management in CI environments assumes the use of dedicated mechanisms such as GitHub Secrets
