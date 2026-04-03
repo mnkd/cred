@@ -1,41 +1,41 @@
-# ADR-001: cred 自体に認証機構を設けない
+# ADR-001: No authentication mechanism in cred itself
 
-## ステータス
+## Status
 
 Accepted
 
-## コンテキスト
+## Context
 
-cred はローカル開発環境で API Key 等のシークレットを管理する CLI ツールである。
-認証をどのレイヤーで担うかを決める必要がある。
+cred is a CLI tool for managing secrets such as API keys in a local development environment.
+We need to decide which layer handles authentication.
 
-### 想定環境
+### Target environments
 
-- ローカルマシンでの MCP、スクリプト実行時の参照
-- 開発中の Web アプリ
-- Docker（ローカル実行）
+- Reference during MCP and script execution on a local machine
+- Web apps under development
+- Docker (local execution)
 
-ローカル外（CI、共有サーバー等）での実行は想定しない。
+Execution outside local environments (CI, shared servers, etc.) is not targeted.
 
-## 決定
+## Decision
 
-cred 自体には認証機構を設けず、OS キーリングの認証に委譲する。
+cred does not implement its own authentication mechanism; it delegates to the OS keyring's authentication.
 
-- macOS Keychain: ユーザーのログインパスワードで保護。初回アクセス時に OS がアクセス許可ダイアログを表示
-- Linux Secret Service: ユーザーセッション（ログイン）で保護
-- Windows Credential Manager: Windows ログインで保護
+- macOS Keychain: Protected by the user's login password. The OS displays an access permission dialog on first access
+- Linux Secret Service: Protected by the user session (login)
+- Windows Credential Manager: Protected by Windows login
 
-「ログイン済みユーザー = 認証済み」というモデルを採用する。
+We adopt the model: "logged-in user = authenticated."
 
-## 根拠
+## Rationale
 
-- gh CLI が同じアーキテクチャ（`zalando/go-keyring` + セッション認証なし）で GitHub アクセストークンを管理しており、モデルの妥当性が実証されている
-- 1Password CLI (`op`) のセッション管理（`op signin`）が面倒だったことが cred の開発動機であり、独自認証の追加はこの動機と矛盾する
-- OS キーリングはユーザーごとに分離されており、別ユーザーからの保護も OS が担う
-- 想定環境がローカルに限定されるため、追加の認証レイヤーは不要
+- gh CLI uses the same architecture (`zalando/go-keyring` + no session auth) to manage GitHub access tokens, proving the model's validity
+- The development motivation for cred was the inconvenience of 1Password CLI (`op`) session management (`op signin`); adding custom authentication contradicts this motivation
+- The OS keyring is isolated per user, and cross-user protection is handled by the OS
+- Since the target environment is limited to local machines, an additional authentication layer is unnecessary
 
-## 影響
+## Consequences
 
-- cred はシークレットの値を OS キーリングにのみ保存する（設定ファイルに書かない）
-- プロセス間のメモリ保護、アクセス制御は OS に委譲する
-- ローカル外の環境サポートは対象外とする
+- cred stores secret values only in the OS keyring (never in config files)
+- Memory protection between processes and access control are delegated to the OS
+- Support for non-local environments is out of scope

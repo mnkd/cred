@@ -37,7 +37,7 @@ Examples:
 		ns := cfg.ActiveNamespace(namespace)
 		service := keyring.ServiceName(ns)
 
-		// 現在の値を取得
+		// Retrieve current value
 		current, err := keyring.Get(service, key)
 		if err != nil {
 			if errors.Is(err, keyring.ErrNotFound) {
@@ -46,7 +46,7 @@ Examples:
 			return fmt.Errorf("failed to retrieve from keyring: %w", err)
 		}
 
-		// 一時ファイルに書き出し
+		// Write to temp file
 		tmpFile, err := os.CreateTemp("", "cred-edit-*")
 		if err != nil {
 			return fmt.Errorf("failed to create temp file: %w", err)
@@ -60,7 +60,7 @@ Examples:
 		}
 		tmpFile.Close()
 
-		// エディタで開く
+		// Open in editor
 		editor := os.Getenv("EDITOR")
 		if editor == "" {
 			editor = "vi"
@@ -73,7 +73,7 @@ Examples:
 			return fmt.Errorf("editor exited with error: %w", err)
 		}
 
-		// 編集後の値を読み込み
+		// Read edited value
 		data, err := os.ReadFile(tmpPath)
 		if err != nil {
 			return fmt.Errorf("failed to read edited file: %w", err)
@@ -89,12 +89,12 @@ Examples:
 			return fmt.Errorf("value cannot be empty")
 		}
 
-		// キーリングに保存
+		// Store in keyring
 		if err := keyring.Set(service, key, newValue); err != nil {
 			return fmt.Errorf("failed to store in keyring: %w", err)
 		}
 
-		// メタデータの updated_at を更新
+		// Update metadata updated_at
 		if nsConfig, ok := cfg.Namespaces[ns]; ok {
 			if meta, ok := nsConfig.Keys[key]; ok {
 				meta.UpdatedAt = time.Now().UTC().Format(time.RFC3339)

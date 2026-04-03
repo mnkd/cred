@@ -1,23 +1,23 @@
 # cred - Credential Manager for Local Development
 
-`.env` ファイルに散らばった API Key を OS キーリングで一元管理する CLI ツール。
-GitHub CLI (`gh`) の credential 管理アーキテクチャに着想を得ています。
+A CLI tool that centrally manages API keys scattered across `.env` files using the OS keyring.
+Inspired by the credential management architecture of GitHub CLI (`gh`).
 
-## 特徴
+## Features
 
-- **セッション管理不要**: macOS Keychain を使用するため、`op signin` のような再認証が不要
-- **macOS 専用**: ローカル開発環境（macOS）に特化
-- **namespace で整理**: プロジェクトや環境ごとに credential をグルーピング
-- **env 注入**: `cred run -- python app.py` で環境変数として自動注入
-- **.env インポート**: 既存の `.env` ファイルから一括移行
+- **No session management**: Uses macOS Keychain — no re-authentication like `op signin` required
+- **macOS only**: Designed specifically for local development on macOS
+- **Namespace organization**: Group credentials by project or environment
+- **Env injection**: Automatically inject as environment variables with `cred run -- python app.py`
+- **.env import**: Bulk migrate from existing `.env` files
 
-## インストール
+## Installation
 
 ```bash
 go install github.com/mnkd/cred@latest
 ```
 
-または、リポジトリをクローンしてビルド:
+Or clone and build:
 
 ```bash
 git clone https://github.com/mnkd/cred.git
@@ -25,203 +25,203 @@ cd cred
 go build -o cred .
 ```
 
-## 使い方
+## Usage
 
-### `cred set` — シークレットの保存
+### `cred set` — Store a secret
 
 ```bash
-# 入力プロンプトで値を入力（画面に表示される）
+# Enter value via input prompt (visible on screen)
 cred set OPENAI_API_KEY
 
-# 値を直接指定して保存
+# Store with value specified directly
 cred set OPENAI_API_KEY sk-xxxxxxxxxxxx
 
-# 説明を付けて保存
-cred set OPENAI_API_KEY sk-xxxxxxxxxxxx -d "OpenAI production"
+# Store with a description
+cred set OPENAI_API_KEY sk-xxxxxxxxxxxx -d "OpenAI dev"
 
-# stdin から読み込み（パイプ連携）
+# Read from stdin (pipe)
 echo "sk-xxxx" | cred set OPENAI_API_KEY -
 cat token.txt | cred set GITHUB_TOKEN -
 
-# 特定の namespace に保存
+# Store in a specific namespace
 cred set ANTHROPIC_API_KEY -n work
 
-# 既存キーの値を更新（説明はそのまま保持される）
+# Update an existing key's value (description is preserved)
 cred set OPENAI_API_KEY sk-new-key
 ```
 
-### `cred get` — シークレットの取得
+### `cred get` — Retrieve a secret
 
 ```bash
-# 値を stdout に出力（末尾改行なし）
+# Output value to stdout (no trailing newline)
 cred get OPENAI_API_KEY
 
-# コマンド置換でシェル変数に代入
+# Assign to a shell variable via command substitution
 export OPENAI_API_KEY=$(cred get OPENAI_API_KEY)
 
-# パイプでクリップボードにコピー（macOS）
+# Copy to clipboard via pipe (macOS)
 cred get OPENAI_API_KEY | pbcopy
 
-# 特定の namespace から取得
-cred get DB_PASSWORD -n production
+# Retrieve from a specific namespace
+cred get DB_PASSWORD -n work
 
-# スクリプト内で利用
+# Use in scripts
 curl -H "Authorization: Bearer $(cred get GITHUB_TOKEN)" https://api.github.com/user
 ```
 
-### `cred delete` — シークレットの削除
+### `cred delete` — Delete a secret
 
 ```bash
-# キーリングと設定ファイルの両方から削除
+# Delete from both keyring and config file
 cred delete OPENAI_API_KEY
 
-# エイリアス（rm / remove）でも同様
+# Aliases (rm / remove) work the same
 cred rm OPENAI_API_KEY
 cred remove OPENAI_API_KEY
 
-# 特定の namespace から削除
+# Delete from a specific namespace
 cred delete AWS_SECRET_KEY -n work
 ```
 
-### `cred list` — 登録済みキーの一覧
+### `cred list` — List registered keys
 
 ```bash
-# 現在の namespace のキー一覧
+# List keys in the current namespace
 cred list
 
-# エイリアス
+# Alias
 cred ls
 
-# 特定の namespace のキー一覧
-cred list -n production
+# List keys in a specific namespace
+cred list -n work
 
-# 全 namespace のキーを横断表示
+# List keys across all namespaces
 cred list --all
 cred ls -a
 ```
 
-### `cred import` — .env ファイルからインポート
+### `cred import` — Import from .env file
 
 ```bash
-# .env ファイルの内容をキーリングに一括登録
+# Bulk register .env file contents into the keyring
 cred import .env
 
-# プレビュー（実際には保存しない）
+# Preview (dry run, nothing is saved)
 cred import .env --dry-run
 
-# 既存キーを上書き
+# Overwrite existing keys
 cred import .env --overwrite
 
-# 特定の namespace にインポート
-cred import .env.production -n production
+# Import into a specific namespace
+cred import .env.local -n dev
 
-# プレビューしてから上書きインポート
+# Preview then overwrite
 cred import .env --dry-run
 cred import .env --overwrite
 ```
 
-### `cred export` — .env 形式でエクスポート
+### `cred export` — Export in .env format
 
 ```bash
-# 現在の namespace の全キーを .env 形式で stdout に出力
+# Output all keys in the current namespace as .env format to stdout
 cred export
 
-# ファイルに保存
+# Save to file
 cred export > .env.local
 
-# 特定の namespace からエクスポート
-cred export -n production
+# Export from a specific namespace
+cred export -n work
 
-# 特定のキーだけ出力
+# Export specific keys only
 cred export --keys OPENAI_API_KEY,DB_PASSWORD
 ```
 
-### `cred edit` — エディタでシークレットを編集
+### `cred edit` — Edit a secret in an editor
 
 ```bash
-# $EDITOR（デフォルト: vi）で値を編集
+# Edit value in $EDITOR (default: vi)
 cred edit OPENAI_API_KEY
 
-# エディタを指定
+# Specify editor
 EDITOR=code cred edit CONFIG_JSON
 
-# 特定の namespace のキーを編集
-cred edit DB_PASSWORD -n production
+# Edit a key in a specific namespace
+cred edit DB_PASSWORD -n work
 ```
 
-### `cred run` — 環境変数を注入してコマンド実行
+### `cred run` — Run a command with injected environment variables
 
 ```bash
-# 現在の namespace の全 credential を環境変数として注入
+# Inject all credentials from the current namespace as environment variables
 cred run -- python app.py
 cred run -- node server.js
 
-# 特定の namespace から注入
-cred run -n production -- ./deploy.sh
+# Inject from a specific namespace
+cred run -n work -- ./run-local.sh
 
-# 注入された環境変数を確認
+# Verify injected environment variables
 cred run -- env | grep OPENAI
 
-# Docker に渡す
+# Pass to Docker
 cred run -- docker run --env OPENAI_API_KEY app:latest
 
-# 複数コマンドをシェル経由で実行
+# Run multiple commands via shell
 cred run -- sh -c 'echo "key=$OPENAI_API_KEY" && python app.py'
 ```
 
-### `cred namespace` — namespace 管理
+### `cred namespace` — Namespace management
 
 ```bash
-# namespace 一覧（現在のデフォルトに * が付く）
+# List namespaces (* marks the current default)
 cred ns list
 
-# 新しい namespace を作成
+# Create a new namespace
 cred ns create work
-cred ns create production -d "本番環境用 API キー"
+cred ns create dev -d "API keys for development"
 
-# デフォルト namespace を確認
+# Show the default namespace
 cred ns default
 
-# デフォルト namespace を切り替え
+# Switch the default namespace
 cred ns default work
 
-# namespace を削除（確認プロンプトあり）
+# Delete a namespace (with confirmation prompt)
 cred ns delete work
 
-# 確認をスキップして削除
+# Skip confirmation and delete
 cred ns delete staging --force
 
-# namespace を切り替えながら操作
+# Operate with a specific namespace
 cred set API_KEY -n work
 cred get API_KEY -n work
 cred list -n work
 cred run -n work -- python app.py
 ```
 
-### シェル連携の応用
+### Shell integration examples
 
 ```bash
-# .bashrc / .zshrc で自動 export
+# Auto-export in .bashrc / .zshrc
 export OPENAI_API_KEY=$(cred get OPENAI_API_KEY)
 export ANTHROPIC_API_KEY=$(cred get ANTHROPIC_API_KEY)
 
-# パイプでクリップボードにコピー
+# Copy to clipboard via pipe
 cred get OPENAI_API_KEY | pbcopy    # macOS
 cred get OPENAI_API_KEY | xclip     # Linux
 
-# 別のツールにシークレットを渡す
+# Pass secrets to other tools
 gh secret set OPENAI_API_KEY --body "$(cred get OPENAI_API_KEY)"
 
-# .env を cred に移行してから削除
-cred import .env --dry-run   # まずプレビュー
-cred import .env              # インポート実行
-rm .env                       # 元ファイルを削除
+# Migrate from .env to cred
+cred import .env --dry-run   # Preview first
+cred import .env              # Import
+rm .env                       # Remove the original file
 ```
 
-### `cred doctor` — 環境診断
+### `cred doctor` — Environment diagnostics
 
 ```bash
-# キーリングの可用性、設定ファイル、整合性をチェック
+# Check keyring availability, config file, and consistency
 cred doctor
 # ✓ Keyring: accessible
 # ✓ Config: ~/.config/cred/config.yml
@@ -229,26 +229,26 @@ cred doctor
 # ⚠ default/OLD_KEY: in config but not in keyring
 ```
 
-### `--format json` — JSON 出力
+### `--format json` — JSON output
 
 ```bash
-# cred get の JSON 出力
+# JSON output for cred get
 cred get OPENAI_API_KEY --format json
 # {"key":"OPENAI_API_KEY","value":"sk-xxx"}
 
-# cred list の JSON 出力
+# JSON output for cred list
 cred list --format json
 # [{"key":"OPENAI_API_KEY","env_var":"OPENAI_API_KEY","description":"..."}]
 
-# cred ns list の JSON 出力
+# JSON output for cred ns list
 cred ns list --format json
 # [{"name":"default","default":true,"key_count":3}]
 ```
 
-## 設定ファイル
+## Config File
 
-`~/.config/cred/config.yml` にメタデータが保存されます。
-**シークレットの値は設定ファイルには保存されません** — OS キーリングにのみ保存されます。
+Metadata is stored in `~/.config/cred/config.yml`.
+**Secret values are never stored in the config file** — they are stored only in the OS keyring.
 
 ```yaml
 version: 1
@@ -257,26 +257,26 @@ namespaces:
   default:
     keys:
       OPENAI_API_KEY:
-        description: "OpenAI API Key (production)"
+        description: "OpenAI API Key (dev)"
         env_var: OPENAI_API_KEY
         created_at: "2026-03-31T00:00:00Z"
         updated_at: "2026-03-31T00:00:00Z"
       ANTHROPIC_API_KEY:
         env_var: ANTHROPIC_API_KEY
   work:
-    description: "業務用"
+    description: "Work credentials"
     keys:
       AWS_ACCESS_KEY_ID:
         env_var: AWS_ACCESS_KEY_ID
 ```
 
-## アーキテクチャ
+## Architecture
 
 ```
 cred
-├── main.go                       # エントリポイント
+├── main.go                       # Entry point
 ├── cmd/
-│   ├── root.go                   # ルートコマンド + グローバルフラグ
+│   ├── root.go                   # Root command + global flags
 │   ├── set.go                    # cred set
 │   ├── get.go                    # cred get
 │   ├── delete.go                 # cred delete
@@ -289,40 +289,40 @@ cred
 │   └── namespace.go              # cred ns {list,create,default,delete}
 └── internal/
     ├── keyring/
-    │   └── keyring.go            # OS キーリングラッパー（3秒タイムアウト）
+    │   └── keyring.go            # OS keyring wrapper (3-second timeout)
     ├── config/
-    │   └── config.go             # YAML 設定ファイル管理
+    │   └── config.go             # YAML config file management
     └── env/
-        └── env.go                # .env ファイルパーサー
+        └── env.go                # .env file parser
 ```
 
-### キーリングでの保存形式
+### Keyring storage format
 
 ```
-service: "cred:{namespace}"    (例: "cred:default", "cred:work")
-user:    "{key_name}"          (例: "OPENAI_API_KEY")
-secret:  "{actual_value}"      (例: "sk-xxxxxxxxxxxx")
+service: "cred:{namespace}"    (e.g., "cred:default", "cred:work")
+user:    "{key_name}"          (e.g., "OPENAI_API_KEY")
+secret:  "{actual_value}"      (e.g., "sk-xxxxxxxxxxxx")
 ```
 
-## gh CLI との比較
+## Comparison with gh CLI
 
-| 項目 | gh CLI | cred |
-|------|--------|------|
-| バックエンド | zalando/go-keyring | zalando/go-keyring（同じ） |
-| キー設計 | `gh:{hostname}` + `{username}` | `cred:{namespace}` + `{key_name}` |
-| 用途 | GitHub トークン専用 | 汎用（任意の API Key） |
-| env 注入 | なし | `cred run` で対応 |
-| .env インポート | なし | `cred import` で対応 |
-| .env エクスポート | なし | `cred export` で対応 |
-| JSON 出力 | なし | `--format json` で対応 |
+| Feature | gh CLI | cred |
+|---------|--------|------|
+| Backend | zalando/go-keyring | zalando/go-keyring (same) |
+| Key design | `gh:{hostname}` + `{username}` | `cred:{namespace}` + `{key_name}` |
+| Purpose | GitHub tokens only | General-purpose (any API key) |
+| Env injection | N/A | `cred run` |
+| .env import | N/A | `cred import` |
+| .env export | N/A | `cred export` |
+| JSON output | N/A | `--format json` |
 
-## 依存ライブラリ
+## Dependencies
 
-- [spf13/cobra](https://github.com/spf13/cobra) — CLI フレームワーク
-- [zalando/go-keyring](https://github.com/zalando/go-keyring) — クロスプラットフォーム キーリング
-- [go-yaml/yaml](https://github.com/go-yaml/yaml) — YAML パーサー
-- [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) — セキュアプロンプト入力
+- [spf13/cobra](https://github.com/spf13/cobra) — CLI framework
+- [zalando/go-keyring](https://github.com/zalando/go-keyring) — Cross-platform keyring
+- [go-yaml/yaml](https://github.com/go-yaml/yaml) — YAML parser
+- [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) — Secure prompt input
 
-## ライセンス
+## License
 
 MIT
