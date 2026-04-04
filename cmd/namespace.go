@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -27,25 +26,6 @@ var nsListCmd = &cobra.Command{
 			return err
 		}
 		active := cfg.ActiveNamespace("")
-
-		if isJSON() {
-			type nsEntry struct {
-				Name        string `json:"name"`
-				Default     bool   `json:"default"`
-				KeyCount    int    `json:"key_count"`
-				Description string `json:"description,omitempty"`
-			}
-			var entries []nsEntry
-			for name, ns := range cfg.Namespaces {
-				entries = append(entries, nsEntry{
-					Name:        name,
-					Default:     name == active,
-					KeyCount:    len(ns.Keys),
-					Description: ns.Description,
-				})
-			}
-			return json.NewEncoder(os.Stdout).Encode(entries)
-		}
 
 		for name, ns := range cfg.Namespaces {
 			marker := "  "

@@ -120,35 +120,6 @@ cred import .env --dry-run
 cred import .env --overwrite
 ```
 
-### `cred export` — Export in .env format
-
-```bash
-# Output all keys in the current namespace as .env format to stdout
-cred export
-
-# Save to file
-cred export > .env.local
-
-# Export from a specific namespace
-cred export -n work
-
-# Export specific keys only
-cred export --keys OPENAI_API_KEY,DB_PASSWORD
-```
-
-### `cred edit` — Edit a secret in an editor
-
-```bash
-# Edit value in $EDITOR (default: vi)
-cred edit OPENAI_API_KEY
-
-# Specify editor
-EDITOR=code cred edit CONFIG_JSON
-
-# Edit a key in a specific namespace
-cred edit DB_PASSWORD -n work
-```
-
 ### `cred run` — Run a command with injected environment variables
 
 ```bash
@@ -229,22 +200,6 @@ cred doctor
 # ⚠ default/OLD_KEY: in config but not in keyring
 ```
 
-### `--format json` — JSON output
-
-```bash
-# JSON output for cred get
-cred get OPENAI_API_KEY --format json
-# {"key":"OPENAI_API_KEY","value":"sk-xxx"}
-
-# JSON output for cred list
-cred list --format json
-# [{"key":"OPENAI_API_KEY","env_var":"OPENAI_API_KEY","description":"..."}]
-
-# JSON output for cred ns list
-cred ns list --format json
-# [{"name":"default","default":true,"key_count":3}]
-```
-
 ## Config File
 
 Metadata is stored in `~/.config/cred/config.yml`.
@@ -283,8 +238,6 @@ cred
 │   ├── list.go                   # cred list
 │   ├── run.go                    # cred run -- COMMAND
 │   ├── import.go                 # cred import .env
-│   ├── export.go                 # cred export
-│   ├── edit.go                   # cred edit
 │   ├── doctor.go                 # cred doctor
 │   └── namespace.go              # cred ns {list,create,default,delete}
 └── internal/
@@ -313,8 +266,6 @@ secret:  "{actual_value}"      (e.g., "sk-xxxxxxxxxxxx")
 | Purpose | GitHub tokens only | General-purpose (any API key) |
 | Env injection | N/A | `cred run` |
 | .env import | N/A | `cred import` |
-| .env export | N/A | `cred export` |
-| JSON output | N/A | `--format json` |
 
 ## Dependencies
 
