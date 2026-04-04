@@ -30,7 +30,6 @@ type Namespace struct {
 // KeyMeta stores metadata about a credential (not the secret itself).
 type KeyMeta struct {
 	Description string `yaml:"description,omitempty"`
-	EnvVar      string `yaml:"env_var,omitempty"` // env var name for "run" command
 	CreatedAt   string `yaml:"created_at,omitempty"`
 	UpdatedAt   string `yaml:"updated_at,omitempty"`
 }

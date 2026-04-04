@@ -37,14 +37,14 @@ Examples:
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 
 		if listAll {
-			fmt.Fprintln(w, "NAMESPACE\tKEY\tENV_VAR\tDESCRIPTION")
+			fmt.Fprintln(w, "NAMESPACE\tKEY\tDESCRIPTION")
 			namespaces := sortedKeys(cfg.Namespaces)
 			for _, nsName := range namespaces {
 				ns := cfg.Namespaces[nsName]
 				keys := sortedKeyMetaKeys(ns.Keys)
 				for _, key := range keys {
 					meta := ns.Keys[key]
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", nsName, key, meta.EnvVar, meta.Description)
+					fmt.Fprintf(w, "%s\t%s\t%s\n", nsName, key, meta.Description)
 				}
 			}
 		} else {
@@ -56,12 +56,12 @@ Examples:
 			}
 
 			fmt.Fprintf(os.Stderr, "Namespace: %s\n\n", nsName)
-			fmt.Fprintln(w, "KEY\tENV_VAR\tDESCRIPTION\tUPDATED")
+			fmt.Fprintln(w, "KEY\tDESCRIPTION\tUPDATED")
 			keys := sortedKeyMetaKeys(ns.Keys)
 			for _, key := range keys {
 				meta := ns.Keys[key]
 				warning := staleWarning(meta.UpdatedAt)
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s%s\n", key, meta.EnvVar, meta.Description, meta.UpdatedAt, warning)
+				fmt.Fprintf(w, "%s\t%s\t%s%s\n", key, meta.Description, meta.UpdatedAt, warning)
 			}
 		}
 
