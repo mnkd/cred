@@ -6,25 +6,17 @@
 |---|---|---|---|
 | **Process execution** | `syscall.Exec()` | `setenv()` + `execvp()` | `syscall.Exec()` |
 | **Execution method** | exec (process replacement) | exec (process replacement) | exec (process replacement) |
-| **Env var construction** | `os.Environ()` + `append` | `setenv(overwrite=1)` | `os.Environ()` + append |
-| **Conflict with existing vars** | Appends to end (OS-dependent) | Explicit overwrite | Overwrite |
+| **Env var construction** | `os.Environ()` + `setEnv` (overwrite) | `setenv(overwrite=1)` | `os.Environ()` + overwrite |
+| **Conflict with existing vars** | Explicit overwrite | Explicit overwrite | Explicit overwrite |
 | **Command resolution** | `exec.LookPath()` | `execvp()` (auto PATH search) | `exec.LookPath()` |
 
 ### Common Pattern
 
 All three tools use exec (process replacement). The cred/envchain/aws-vault process replaces itself with the target command -- no parent process remains. This is the standard Unix pattern for injecting environment variables.
 
-### cred-specific: Conflict Behavior
+### Env Var Conflict Handling
 
-cred appends credentials to the end of the environ slice (`run.go:67`):
-
-```go
-environ = append(environ, envVar+"="+value)
-```
-
-When a variable with the same name already exists, **which value takes precedence depends on the OS/runtime**. In contrast, envchain uses `setenv(overwrite=1)` for explicit overwriting, and aws-vault also overwrites explicitly.
-
-This is a potential behavioral difference worth noting.
+All three tools now explicitly overwrite existing environment variables. cred uses a `setEnv` helper that scans the environ slice for a matching `KEY=` prefix and overwrites in place (see ADR-003).
 
 ## Security Model
 
@@ -57,7 +49,7 @@ All three tools share the same fundamental security model:
 
 ## Potential Improvements for cred
 
-1. **Env var conflict handling**: Consider explicitly overwriting existing variables to match envchain/aws-vault behavior, rather than appending.
+1. ~~**Env var conflict handling**~~: Resolved in ADR-003 — now explicitly overwrites existing variables.
 2. **Passphrase control**: Evaluate whether an envchain-like `--require-passphrase` feature is needed.
 
 ---

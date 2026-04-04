@@ -64,7 +64,7 @@ Examples:
 				if envVar == "" {
 					envVar = key
 				}
-				environ = append(environ, envVar+"="+value)
+				environ = setEnv(environ, envVar, value)
 				injected++
 			}
 		}
