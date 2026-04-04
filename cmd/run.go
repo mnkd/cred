@@ -49,7 +49,9 @@ Examples:
 
 		if ok {
 			service := keyring.ServiceName(ns)
-			for key := range nsConfig.Keys {
+			// Sort keys for deterministic injection order (fixes #7)
+			keys := sortedKeys(nsConfig.Keys)
+			for _, key := range keys {
 				value, err := keyring.Get(service, key)
 				if err != nil {
 					if errors.Is(err, keyring.ErrNotFound) {
