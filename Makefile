@@ -1,6 +1,6 @@
 BINARY := cred
 
-.PHONY: all build install clean test lint fmt tidy help
+.PHONY: all build install clean test test-integration lint fmt tidy help
 
 all: build
 
@@ -15,6 +15,9 @@ clean:
 
 test:
 	go test ./...
+
+test-integration:
+	go test -tags integration -v -count=1 ./integration/
 
 lint:
 	go vet ./...

@@ -222,6 +222,41 @@ namespaces:
       AWS_ACCESS_KEY_ID: {}
 ```
 
+## Testing
+
+### Unit tests
+
+```bash
+make test
+```
+
+### Integration tests
+
+Integration tests verify the full `cred run` flow (config → keyring → env injection → command execution) using the real OS keyring.
+
+```bash
+make test-integration
+```
+
+### Manual verification with `testcred`
+
+`testcred` is a helper that prints specified environment variables as `KEY=VALUE` lines. Use it to manually verify `cred run` behavior.
+
+```bash
+# Build testcred
+go build -o testcred ./cmd/testcred
+
+# Basic usage: prints the value of each specified key
+TEST_VAR=hello ./testcred TEST_VAR
+# TEST_VAR=hello
+
+# Verify cred run injects credentials
+cred run -- ./testcred OPENAI_API_KEY ANTHROPIC_API_KEY
+
+# Verify a specific namespace
+cred run -n work -- ./testcred AWS_ACCESS_KEY_ID
+```
+
 ## Architecture
 
 ```
@@ -236,7 +271,11 @@ cred
 │   ├── run.go                    # cred run -- COMMAND
 │   ├── import.go                 # cred import .env
 │   ├── doctor.go                 # cred doctor
-│   └── namespace.go              # cred ns {list,create,default,delete}
+│   ├── namespace.go              # cred ns {list,create,default,delete}
+│   └── testcred/
+│       └── main.go               # Test helper: prints env vars as KEY=VALUE
+├── integration/
+│   └── integration_test.go       # Integration tests for cred run
 └── internal/
     ├── keyring/
     │   └── keyring.go            # OS keyring wrapper (3-second timeout)
