@@ -17,7 +17,7 @@ func TestSetEnv(t *testing.T) {
 			environ:  []string{"HOME=/home/user", "API_KEY=old", "PATH=/usr/bin"},
 			key:      "API_KEY",
 			value:    "new",
-			expected: []string{"HOME=/home/user", "API_KEY=new", "PATH=/usr/bin"},
+			expected: []string{"HOME=/home/user", "PATH=/usr/bin", "API_KEY=new"},
 		},
 		{
 			name:     "append when not present",
@@ -48,11 +48,11 @@ func TestSetEnv(t *testing.T) {
 			expected: []string{"API_KEY=secret"},
 		},
 		{
-			name:     "overwrite first entry",
-			environ:  []string{"API_KEY=old", "OTHER=val"},
+			name:     "dedupe duplicate existing variables",
+			environ:  []string{"HOME=/home/user", "API_KEY=old1", "API_KEY=old2", "PATH=/usr/bin"},
 			key:      "API_KEY",
 			value:    "new",
-			expected: []string{"API_KEY=new", "OTHER=val"},
+			expected: []string{"HOME=/home/user", "PATH=/usr/bin", "API_KEY=new"},
 		},
 	}
 

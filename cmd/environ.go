@@ -2,16 +2,16 @@ package cmd
 
 import "strings"
 
-// setEnv sets key=value in the environ slice, overwriting any existing
-// entry with the same key. If the key does not exist, it is appended.
-// This matches the behavior of envchain's setenv(overwrite=1).
+// setEnv sets key=value in the environ slice, removing all existing
+// entries with the same key and appending the new value at the end.
+// This ensures exactly one entry per key, matching envchain's setenv(overwrite=1).
 func setEnv(environ []string, key, value string) []string {
 	prefix := key + "="
-	for i, entry := range environ {
-		if strings.HasPrefix(entry, prefix) {
-			environ[i] = prefix + value
-			return environ
+	out := environ[:0]
+	for _, entry := range environ {
+		if !strings.HasPrefix(entry, prefix) {
+			out = append(out, entry)
 		}
 	}
-	return append(environ, prefix+value)
+	return append(out, prefix+value)
 }

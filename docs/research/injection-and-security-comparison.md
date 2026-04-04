@@ -6,8 +6,8 @@
 |---|---|---|---|
 | **Process execution** | `syscall.Exec()` | `setenv()` + `execvp()` | `syscall.Exec()` |
 | **Execution method** | exec (process replacement) | exec (process replacement) | exec (process replacement) |
-| **Env var construction** | `os.Environ()` + `setEnv` (overwrite) | `setenv(overwrite=1)` | `os.Environ()` + append |
-| **Conflict with existing vars** | Explicit overwrite | Explicit overwrite | Overwrite |
+| **Env var construction** | `os.Environ()` + `setEnv` (overwrite) | `setenv(overwrite=1)` | `os.Environ()` + overwrite |
+| **Conflict with existing vars** | Explicit overwrite | Explicit overwrite | Explicit overwrite |
 | **Command resolution** | `exec.LookPath()` | `execvp()` (auto PATH search) | `exec.LookPath()` |
 
 ### Common Pattern
