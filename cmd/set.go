@@ -81,7 +81,6 @@ Examples:
 		now := time.Now().UTC().Format(time.RFC3339)
 		meta := config.KeyMeta{
 			Description: setDescription,
-			EnvVar:      key, // default env var name = key name
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}

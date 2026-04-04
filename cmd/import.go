@@ -85,7 +85,6 @@ Examples:
 
 			// Update config metadata
 			meta := config.KeyMeta{
-				EnvVar:    entry.Key,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}

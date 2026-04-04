@@ -213,16 +213,13 @@ namespaces:
     keys:
       OPENAI_API_KEY:
         description: "OpenAI API Key (dev)"
-        env_var: OPENAI_API_KEY
         created_at: "2026-03-31T00:00:00Z"
         updated_at: "2026-03-31T00:00:00Z"
-      ANTHROPIC_API_KEY:
-        env_var: ANTHROPIC_API_KEY
+      ANTHROPIC_API_KEY: {}
   work:
     description: "Work credentials"
     keys:
-      AWS_ACCESS_KEY_ID:
-        env_var: AWS_ACCESS_KEY_ID
+      AWS_ACCESS_KEY_ID: {}
 ```
 
 ## Architecture

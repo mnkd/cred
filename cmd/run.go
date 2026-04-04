@@ -20,8 +20,7 @@ var runCmd = &cobra.Command{
 	Long: `Execute a command with all credentials from the current namespace
 injected as environment variables.
 
-The env var name for each credential is determined by the "env_var"
-field in config (defaults to the key name).
+Each credential's key name is used as the environment variable name.
 
 Examples:
   cred run -- python app.py                              # Python
@@ -50,7 +49,7 @@ Examples:
 
 		if ok {
 			service := keyring.ServiceName(ns)
-			for key, meta := range nsConfig.Keys {
+			for key := range nsConfig.Keys {
 				value, err := keyring.Get(service, key)
 				if err != nil {
 					if errors.Is(err, keyring.ErrNotFound) {
@@ -60,11 +59,7 @@ Examples:
 					return fmt.Errorf("failed to retrieve %s: %w", key, err)
 				}
 
-				envVar := meta.EnvVar
-				if envVar == "" {
-					envVar = key
-				}
-				environ = setEnv(environ, envVar, value)
+				environ = setEnv(environ, key, value)
 				injected++
 			}
 		}

@@ -47,7 +47,6 @@ func TestSaveAndLoad_RoundTrip(t *testing.T) {
 	}
 	cfg.SetKeyMeta("default", "API_KEY", KeyMeta{
 		Description: "test key",
-		EnvVar:      "API_KEY",
 		CreatedAt:   "2026-01-01T00:00:00Z",
 		UpdatedAt:   "2026-01-01T00:00:00Z",
 	})
@@ -68,9 +67,6 @@ func TestSaveAndLoad_RoundTrip(t *testing.T) {
 	if meta.Description != "test key" {
 		t.Errorf("got description %q, want %q", meta.Description, "test key")
 	}
-	if meta.EnvVar != "API_KEY" {
-		t.Errorf("got env_var %q, want %q", meta.EnvVar, "API_KEY")
-	}
 }
 
 func TestEnsureNamespace(t *testing.T) {
@@ -82,7 +78,7 @@ func TestEnsureNamespace(t *testing.T) {
 	}
 
 	// Double call should not overwrite existing data
-	cfg.SetKeyMeta("work", "KEY", KeyMeta{EnvVar: "KEY"})
+	cfg.SetKeyMeta("work", "KEY", KeyMeta{})
 	cfg.EnsureNamespace("work")
 	if _, ok := cfg.Namespaces["work"].Keys["KEY"]; !ok {
 		t.Fatal("existing key lost after second EnsureNamespace")
@@ -91,7 +87,7 @@ func TestEnsureNamespace(t *testing.T) {
 
 func TestSetKeyMeta_And_DeleteKeyMeta(t *testing.T) {
 	cfg := defaultConfig()
-	cfg.SetKeyMeta("default", "FOO", KeyMeta{EnvVar: "FOO"})
+	cfg.SetKeyMeta("default", "FOO", KeyMeta{})
 
 	if _, ok := cfg.Namespaces["default"].Keys["FOO"]; !ok {
 		t.Fatal("FOO not set")

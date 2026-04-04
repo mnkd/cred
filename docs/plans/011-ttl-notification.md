@@ -13,8 +13,8 @@
 
 ```bash
 cred list
-# KEY              ENV_VAR          DESCRIPTION        UPDATED
-# OPENAI_API_KEY   OPENAI_API_KEY   OpenAI production  2025-01-01T... ⚠ 90日以上未更新
+# KEY              DESCRIPTION        UPDATED
+# OPENAI_API_KEY   OpenAI production  2025-01-01T... ⚠ 90日以上未更新
 ```
 
 ## 変更箇所
