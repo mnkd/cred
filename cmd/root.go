@@ -4,10 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	namespace    string
-	outputFormat string
-)
+var namespace string
 
 var rootCmd = &cobra.Command{
 	Use:   "cred",
@@ -29,11 +26,6 @@ Quick start:
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to use (default: from config)")
-	rootCmd.PersistentFlags().StringVar(&outputFormat, "format", "text", "output format: text or json")
-}
-
-func isJSON() bool {
-	return outputFormat == "json"
 }
 
 func Execute() error {

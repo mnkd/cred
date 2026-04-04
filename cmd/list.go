@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -33,10 +32,6 @@ Examples:
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		if isJSON() {
-			return listJSON(cfg)
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
@@ -90,48 +85,6 @@ func sortedKeyMetaKeys(m map[string]config.KeyMeta) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-type listEntry struct {
-	Namespace   string `json:"namespace,omitempty"`
-	Key         string `json:"key"`
-	EnvVar      string `json:"env_var"`
-	Description string `json:"description,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
-}
-
-func listJSON(cfg *config.Config) error {
-	var entries []listEntry
-
-	if listAll {
-		for nsName, ns := range cfg.Namespaces {
-			for key, meta := range ns.Keys {
-				entries = append(entries, listEntry{
-					Namespace:   nsName,
-					Key:         key,
-					EnvVar:      meta.EnvVar,
-					Description: meta.Description,
-					UpdatedAt:   meta.UpdatedAt,
-				})
-			}
-		}
-	} else {
-		nsName := cfg.ActiveNamespace(namespace)
-		ns, ok := cfg.Namespaces[nsName]
-		if !ok || len(ns.Keys) == 0 {
-			return json.NewEncoder(os.Stdout).Encode([]listEntry{})
-		}
-		for key, meta := range ns.Keys {
-			entries = append(entries, listEntry{
-				Key:         key,
-				EnvVar:      meta.EnvVar,
-				Description: meta.Description,
-				UpdatedAt:   meta.UpdatedAt,
-			})
-		}
-	}
-
-	return json.NewEncoder(os.Stdout).Encode(entries)
 }
 
 // staleWarning returns a warning string if the updated_at timestamp exceeds the stale threshold.
