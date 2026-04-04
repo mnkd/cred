@@ -13,11 +13,19 @@ Inspired by the credential management architecture of GitHub CLI (`gh`).
 
 ## Installation
 
+### Homebrew
+
+```bash
+brew install mnkd/tap/cred
+```
+
+### Go install
+
 ```bash
 go install github.com/mnkd/cred@latest
 ```
 
-Or clone and build:
+### Build from source
 
 ```bash
 git clone https://github.com/mnkd/cred.git
