@@ -77,6 +77,18 @@ cred get DB_PASSWORD -n work
 curl -H "Authorization: Bearer $(cred get GITHUB_TOKEN)" https://api.github.com/user
 ```
 
+#### Why a `%` appears at the end of the output
+
+The value is printed without a trailing newline so that piping it to `pbcopy` or `xclip` does not copy a stray newline, which would break header values and token comparisons. Because the output does not end with a newline, zsh appends a reverse-video `%` before drawing the next prompt. That marker comes from zsh (the `PROMPT_SP` option), not from `cred`, and is not part of the stored value. Other shells such as bash show nothing and simply continue with the prompt on the same line.
+
+```bash
+# Confirm there is no trailing newline (no 0a at the end of the output)
+cred get OPENAI_API_KEY | xxd | tail -1
+
+# Append a newline when reading the value in a terminal
+cred get OPENAI_API_KEY; echo
+```
+
 ### `cred delete` — Delete a secret
 
 ```bash
