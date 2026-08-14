@@ -79,14 +79,16 @@ curl -H "Authorization: Bearer $(cred get GITHUB_TOKEN)" https://api.github.com/
 
 #### Why a `%` appears at the end of the output
 
-The value is printed without a trailing newline so that piping it to `pbcopy` or `xclip` does not copy a stray newline, which would break header values and token comparisons. Because the output does not end with a newline, zsh appends a reverse-video `%` before drawing the next prompt. That marker comes from zsh (the `PROMPT_SP` option), not from `cred`, and is not part of the stored value. Other shells such as bash show nothing and simply continue with the prompt on the same line.
+The value is printed without a trailing newline. Command substitution strips trailing newlines on its own, so the `$(cred get ...)` examples above behave the same either way. What the omission protects are the paths that carry the bytes through verbatim: piping to `pbcopy` / `xclip` and pasting the value somewhere else, or redirecting it to a file. A newline that survives those paths ends up inside the header value or the token being compared.
+
+Because the output does not end with a newline, zsh appends a reverse-video `%` before drawing the next prompt. That marker comes from zsh (the `PROMPT_SP` option), not from `cred`, and is not part of the stored value. Other shells such as bash show nothing and simply continue with the prompt on the same line.
 
 ```bash
 # Confirm there is no trailing newline (no 0a at the end of the output)
 cred get OPENAI_API_KEY | xxd | tail -1
 
 # Append a newline when reading the value in a terminal
-cred get OPENAI_API_KEY; echo
+cred get OPENAI_API_KEY && echo
 ```
 
 ### `cred delete` — Delete a secret
