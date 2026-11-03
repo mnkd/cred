@@ -15,7 +15,10 @@
 
 ## Trade-offs
 
-- CI no longer verifies that the code builds with the minimum Go version. A newer API could slip in unnoticed
+- CI no longer builds and tests with the minimum Go version itself
+  - Standard library APIs newer than the `go` directive are still caught: `go vet` (stdversion) reports them, and the compiler rejects newer language features
+  - What remains unchecked is behavior that differs between toolchain versions, such as bugs and GODEBUG defaults
+- The release toolchain is not pinned. Re-running the release for an old tag builds with whatever Go is stable at that time. Each binary records the version it was built with (`go version <binary>`)
 
 ## Steps
 
