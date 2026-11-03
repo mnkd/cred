@@ -260,6 +260,14 @@ Integration tests verify the full `cred run` flow (config → keyring → env in
 make test-integration
 ```
 
+### Vulnerability check
+
+Reports known vulnerabilities in dependencies and the standard library that the code actually calls. The standard library is checked against the Go version you run it with. CI runs it weekly and on PRs that change `go.mod` or `go.sum`.
+
+```bash
+make vulncheck
+```
+
 ### Manual verification with `testcred`
 
 `testcred` is a helper that prints specified environment variables as `KEY=VALUE` lines. Use it to manually verify `cred run` behavior.
