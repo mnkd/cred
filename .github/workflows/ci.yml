@@ -17,7 +17,10 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          # go.mod only states the minimum version. Use the latest Go release, as
+          # release.yml does. Each run resolves `stable` on its own, so CI and a
+          # later release can still end up on different patch releases.
+          go-version: stable
 
       - name: Build
         run: go build ./...

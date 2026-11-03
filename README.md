@@ -21,6 +21,8 @@ brew install mnkd/tap/cred
 
 ### Go install
 
+Requires Go 1.26 or later.
+
 ```bash
 go install github.com/mnkd/cred@latest
 ```

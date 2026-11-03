@@ -18,7 +18,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          # go.mod only states the minimum version. Build with the latest patch
+          # release so binaries include standard library security fixes.
+          # Not pinned: re-running an old tag builds with the Go version that is
+          # stable at that time. Each binary records it (`go version <binary>`).
+          go-version: stable
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
