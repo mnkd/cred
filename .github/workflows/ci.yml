@@ -17,7 +17,9 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          # go.mod only states the minimum version. Use the latest patch release so
+          # CI builds against the same standard library as release binaries.
+          go-version: stable
 
       - name: Build
         run: go build ./...
