@@ -1,0 +1,46 @@
+# Check dependencies and the standard library for known vulnerabilities that
+# the code actually calls. The job just runs `make vulncheck`.
+#
+# Not run on every PR: the result depends on that day's vulnerability database,
+# so a newly published vulnerability would turn unrelated PRs red. Run it on PRs
+# that change dependencies or the check itself, and weekly on main to catch
+# vulnerabilities published while dependencies stay the same (mostly in the
+# standard library).
+#
+# Scheduled-run failure notifications go to the user who last modified the cron
+# line (GitHub behavior). To change the recipient, that person edits the cron.
+name: govulncheck
+
+on:
+  schedule:
+    # Monday 09:17 JST. Avoid minute 0, when GitHub Actions is busiest and
+    # scheduled runs get delayed or dropped.
+    - cron: "17 0 * * 1"
+  pull_request:
+    paths:
+      - go.mod
+      - go.sum
+      # The check itself. GOVULNCHECK_VERSION and the vulncheck target live here.
+      - Makefile
+      - .github/workflows/govulncheck.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The standard library is checked against this Go version. Use the latest
+      # Go release, as release builds do (see release.yml).
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - run: make vulncheck
