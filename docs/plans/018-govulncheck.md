@@ -9,7 +9,7 @@ Nothing checks dependencies or the standard library for known vulnerabilities.
 1. Add `make vulncheck` (version pinned with `GOVULNCHECK_VERSION`)
 2. Add `.github/workflows/govulncheck.yml`
    - Triggers: weekly on main, PRs that change `go.mod` / `go.sum` / `Makefile` / the workflow itself, and manual runs
-   - Use `go-version: stable`, the same Go version as release builds, because the standard library is checked against the Go version that runs govulncheck
+   - Use `go-version: stable`, as release builds do, because the standard library is checked against the Go version that runs govulncheck
 3. Do not run it on every PR and do not make it a required check
    - The result depends on that day's vulnerability database, so a new advisory would block unrelated PRs
 

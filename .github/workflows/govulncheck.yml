@@ -37,8 +37,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # The standard library is checked against this Go version, so use the
-      # same version as release builds (see release.yml).
+      # The standard library is checked against this Go version. Use the latest
+      # Go release, as release builds do (see release.yml).
       - uses: actions/setup-go@v5
         with:
           go-version: stable
