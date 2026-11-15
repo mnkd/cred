@@ -20,6 +20,18 @@ Inspired by the credential management architecture of GitHub CLI (`gh`).
 brew install mnkd/tap/cred
 ```
 
+cred is distributed as a cask, and the binary is signed with a Developer ID and notarized by Apple.
+
+If you installed cred as a formula (0.2.x or earlier), `brew update` reports that it has been migrated to a cask. If Homebrew does not install the cask for you, run:
+
+```bash
+brew trust --cask mnkd/tap/cred
+brew install --cask mnkd/tap/cred
+brew uninstall --formula --force cred
+```
+
+`/opt/homebrew/bin/cred` stays the same, so MCP configs that use it need no change.
+
 ### Go install
 
 Requires Go 1.26 or later.
