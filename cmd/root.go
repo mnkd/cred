@@ -22,6 +22,8 @@ Quick start:
   cred import .env                     # Import from .env file
   cred ns create work -d "Work keys"    # Create a namespace
   cred set API_KEY -n work             # Store in specific namespace`,
+	// main prints the returned error; letting cobra print it too shows it twice.
+	SilenceErrors: true,
 }
 
 func init() {
