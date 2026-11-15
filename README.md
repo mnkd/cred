@@ -9,6 +9,7 @@ Inspired by the credential management architecture of GitHub CLI (`gh`).
 - **macOS only**: Designed specifically for local development on macOS
 - **Namespace organization**: Group credentials by project or environment
 - **Env injection**: Automatically inject as environment variables with `cred run -- python app.py`
+- **References**: Keep only `cred://<namespace>/<KEY>` in MCP server configs and dotenv files; `cred run` resolves them at launch
 - **.env import**: Bulk migrate from existing `.env` files
 
 ## Installation
@@ -164,6 +165,97 @@ cred run -- docker run --env OPENAI_API_KEY app:latest
 cred run -- sh -c 'echo "key=$OPENAI_API_KEY" && python app.py'
 ```
 
+#### `cred://` references
+
+Instead of injecting a whole namespace, you can pass only the secrets a command needs. Write a reference `cred://<namespace>/<KEY>` as the value of an environment variable, and `cred run` replaces it with the secret from the keyring before starting the command.
+
+```bash
+# The variable name may differ from the key
+API_TOKEN=cred://work/JIRA_TOKEN cred run -- ./sync.sh
+```
+
+- `<namespace>` and `<KEY>` are the names used with `cred set -n <namespace> <KEY>`
+  - They may contain letters, digits, `_`, `.` and `-`
+- A value that starts with `cred://` but is not in this form is an error
+- Without `-n`, using references (or `--env-file`) turns off namespace injection
+  - Only the referenced secrets reach the command
+  - Add `-n <namespace>` to inject a namespace as well
+
+#### `--env-file`
+
+Load variables from a dotenv file. Values may be plain values or references, like `op run --env-file`.
+
+```bash
+# .env.cred
+API_TOKEN="cred://work/JIRA_TOKEN"  # Jira
+LOG_LEVEL=debug
+```
+
+```bash
+cred run --env-file .env.cred -- python my_script.py
+```
+
+- One `KEY=value` per line
+  - Blank lines and lines starting with `#` are skipped
+  - A `#` after whitespace, or after the closing quote, starts a comment
+  - Surrounding `"` / `'` are removed, and an `export ` prefix is allowed
+  - `KEY` must be a valid environment variable name (letters, digits and `_`, not starting with a digit)
+- `--env-file` can be repeated. Later files win
+
+#### Precedence and errors
+
+Later layers win:
+
+1. The inherited environment
+2. Namespace injection (`-n`, or the default namespace when no references and no `--env-file` are used)
+3. `--env-file`, in the order given
+
+References are resolved after the layers are merged, and each resolved value is used as-is (never resolved again).
+
+If any reference cannot be resolved, the command is not started and `cred` exits with code 1. Error messages show only variable names and references, never values.
+
+```
+✗ Cannot resolve API_TOKEN (cred://work/JIRA_TOKEN): not found in keyring
+```
+
+#### Output
+
+All `cred` messages go to stderr. stdout belongs to the command, so `cred run` can wrap MCP stdio servers that speak JSON-RPC over stdout. The command's output is not modified (secrets are not masked).
+
+#### MCP server configuration
+
+Put references in the server's `env` and wrap the server command with `cred run`.
+
+Codex (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.example]
+command = "/opt/homebrew/bin/cred"
+args = ["run", "--", "/opt/homebrew/bin/npx", "-y", "example-mcp-server@1.2.3"]
+env = { EXAMPLE_TOKEN = "cred://work/EXAMPLE_TOKEN", PATH = "/opt/homebrew/bin:/usr/bin:/bin" }
+```
+
+Claude Code (an entry under `mcpServers` in `.mcp.json` or `~/.claude.json`):
+
+```json
+"example": {
+  "command": "/opt/homebrew/bin/cred",
+  "args": ["run", "--", "/opt/homebrew/bin/npx", "-y", "example-mcp-server@1.2.3"],
+  "env": {
+    "EXAMPLE_TOKEN": "cred://work/EXAMPLE_TOKEN",
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin"
+  }
+}
+```
+
+- Write `command` as an absolute path. Find it with `which cred`
+  - `/opt/homebrew/bin` is the Homebrew prefix on Apple Silicon
+- Desktop apps start MCP servers with a minimal `PATH`
+  - `cred run` looks up the command in its own `PATH`, so use an absolute path for the command too
+  - `npx` starts with `#!/usr/bin/env node`, so the examples set `PATH` in `env` to let it find `node`
+- Write `--env-file` paths as absolute paths too
+  - A relative path is resolved against the client's working directory, which differs between a terminal and a desktop app
+
 ### `cred namespace` — Namespace management
 
 ```bash
@@ -287,6 +379,9 @@ cred run -- ./testcred OPENAI_API_KEY ANTHROPIC_API_KEY
 
 # Verify a specific namespace
 cred run -n work -- ./testcred AWS_ACCESS_KEY_ID
+
+# Verify a reference (only API_TOKEN is set)
+API_TOKEN=cred://work/JIRA_TOKEN cred run -- ./testcred API_TOKEN
 ```
 
 ## Architecture
@@ -313,8 +408,10 @@ cred
     │   └── keyring.go            # OS keyring wrapper (3-second timeout)
     ├── config/
     │   └── config.go             # YAML config file management
-    └── env/
-        └── env.go                # .env file parser
+    ├── env/
+    │   └── env.go                # .env file parser (import, run --env-file)
+    └── ref/
+        └── ref.go                # cred:// reference parser
 ```
 
 ### Keyring storage format

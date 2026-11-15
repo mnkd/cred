@@ -3,6 +3,7 @@ package env
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -95,6 +96,21 @@ func TestParseFile_InvalidFormat(t *testing.T) {
 	}
 }
 
+func TestParseFile_InvalidFormatDoesNotEchoLine(t *testing.T) {
+	// A line without "=" may be a bare secret; it must not appear in the error.
+	path := writeTempEnv(t, "sk-secret-value\n")
+	_, err := ParseFile(path)
+	if err == nil {
+		t.Fatal("expected error for invalid format")
+	}
+	if strings.Contains(err.Error(), "sk-secret-value") {
+		t.Errorf("error leaks line content: %v", err)
+	}
+	if !strings.Contains(err.Error(), "line 1") {
+		t.Errorf("error should include the line number: %v", err)
+	}
+}
+
 func TestParseFile_ValueWithEquals(t *testing.T) {
 	path := writeTempEnv(t, "URL=https://example.com?foo=bar&baz=qux\n")
 	entries, err := ParseFile(path)
@@ -121,5 +137,53 @@ func TestParseFile_NotFound(t *testing.T) {
 	_, err := ParseFile("/nonexistent/.env")
 	if err == nil {
 		t.Fatal("expected error for nonexistent file")
+	}
+}
+
+func TestParseFile_InlineComments(t *testing.T) {
+	content := `QUOTED="cred://work/TOKEN" # jira
+SINGLE='value' # note
+UNQUOTED=cred://work/TOKEN # jira
+TAB=value	# tab before hash
+HASH_IN_VALUE=abc#def
+HASH_IN_QUOTES="a # b"
+ESCAPED="a\"b"
+`
+	path := writeTempEnv(t, content)
+	entries, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"QUOTED":         "cred://work/TOKEN",
+		"SINGLE":         "value",
+		"UNQUOTED":       "cred://work/TOKEN",
+		"TAB":            "value",
+		"HASH_IN_VALUE":  "abc#def",
+		"HASH_IN_QUOTES": "a # b",
+		"ESCAPED":        `a\"b`,
+	}
+	if len(entries) != len(want) {
+		t.Fatalf("got %d entries, want %d", len(entries), len(want))
+	}
+	for _, e := range entries {
+		if e.Value != want[e.Key] {
+			t.Errorf("%s: got %q, want %q", e.Key, e.Value, want[e.Key])
+		}
+	}
+}
+
+func TestParseFile_InvalidKey(t *testing.T) {
+	for _, line := range []string{"=value", "MY KEY=1", "1ABC=x", "KEY-NAME=x"} {
+		path := writeTempEnv(t, line+"\n")
+		_, err := ParseFile(path)
+		if err == nil {
+			t.Errorf("%q: expected error for invalid key", line)
+			continue
+		}
+		if !strings.Contains(err.Error(), "line 1") {
+			t.Errorf("%q: error should include the line number: %v", line, err)
+		}
 	}
 }
