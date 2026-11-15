@@ -176,7 +176,10 @@ API_TOKEN=cred://work/JIRA_TOKEN cred run -- ./sync.sh
 
 - `<namespace>` and `<KEY>` are the names used with `cred set -n <namespace> <KEY>`
   - They may contain letters, digits, `_`, `.` and `-`
-- A value that starts with `cred://` but is not in this form is an error
+- A value that starts with `cred:/` or `cred//` but is not in this form is an error
+  - This catches typos such as `cred:/work/KEY` or `cred//work/KEY` before the command starts, instead of passing them on as plain values
+  - A plain value that starts with `cred:/` or `cred//` cannot be passed through `cred run`
+  - Other values that start with `cred:`, such as `cred:work`, are passed as plain values
 - Without `-n`, using references (or `--env-file`) turns off namespace injection
   - Only the referenced secrets reach the command
   - Add `-n <namespace>` to inject a namespace as well

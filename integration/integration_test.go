@@ -432,6 +432,9 @@ func TestReferenceFailureDoesNotRun(t *testing.T) {
 	if !strings.Contains(stderr, "API_TOKEN") || !strings.Contains(stderr, ref) {
 		t.Errorf("stderr should name the variable and reference: %s", stderr)
 	}
+	if n := strings.Count(stderr, "Error: failed to resolve"); n != 1 {
+		t.Errorf("error should be printed once, got %d times:\n%s", n, stderr)
+	}
 }
 
 // TestEnvFileReference verifies:

@@ -30,7 +30,9 @@ var runCmd = &cobra.Command{
 
 References: any environment variable whose value is cred://<namespace>/<KEY>
 is replaced with the secret from the keyring. --env-file loads KEY=VALUE
-lines from a dotenv file; values may also be references.
+lines from a dotenv file; values may also be references. A value that starts
+with cred:/ or cred// but is not a valid reference (e.g. cred:/work/KEY) is
+an error, so a typo is not passed on as a plain value.
 
 Namespace injection: every key in the namespace is injected under its own
 name. It runs when -n is given, or when no references and no --env-file are
