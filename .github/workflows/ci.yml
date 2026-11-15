@@ -13,9 +13,9 @@ jobs:
   test:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           # go.mod only states the minimum version. Use the latest Go release, as
           # release.yml does. Each run resolves `stable` on its own, so CI and a
