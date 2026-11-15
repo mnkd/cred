@@ -270,3 +270,27 @@ func TestBuildRunEnv_NoSuccessMessagesOnFailure(t *testing.T) {
 		t.Errorf("stderr should not report injection when the command is not started: %s", stderr.String())
 	}
 }
+
+func TestBuildRunEnv_MistypedReferenceFails(t *testing.T) {
+	for _, typo := range []string{"cred:/work/KEY", "cred//work/KEY"} {
+		t.Run(typo, func(t *testing.T) {
+			calls := stubSecrets(t, map[string]string{"cred:default/OTHER": "other-secret"})
+
+			var stderr strings.Builder
+			_, err := buildRunEnv(runEnvInput{
+				Environ:       []string{"TOKEN=" + typo},
+				Namespace:     "default",
+				NamespaceKeys: []string{"OTHER"},
+			}, &stderr)
+			if err == nil {
+				t.Fatal("a mistyped reference must not pass through as a plain value")
+			}
+			if !strings.Contains(stderr.String(), "TOKEN ("+typo+")") {
+				t.Errorf("stderr should name the variable and the value: %s", stderr.String())
+			}
+			if calls["cred:default/OTHER"] != 0 {
+				t.Error("a mistyped reference must not fall back to default namespace injection")
+			}
+		})
+	}
+}
