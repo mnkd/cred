@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -19,6 +20,7 @@ type Entry struct {
 //   - KEY=VALUE
 //   - KEY="VALUE" (double-quoted, strips quotes)
 //   - KEY='VALUE' (single-quoted, strips quotes)
+//   - KEY=VALUE # comment (a "#" after whitespace or after the closing quote starts a comment)
 //   - # comments
 //   - empty lines
 //   - export KEY=VALUE (strips export prefix)
@@ -52,17 +54,11 @@ func ParseFile(path string) ([]Entry, error) {
 		}
 
 		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		// Strip surrounding quotes
-		if len(value) >= 2 {
-			if (value[0] == '"' && value[len(value)-1] == '"') ||
-				(value[0] == '\'' && value[len(value)-1] == '\'') {
-				value = value[1 : len(value)-1]
-			}
+		if !validKey.MatchString(key) {
+			return nil, fmt.Errorf("line %d: invalid key (expected letters, digits and '_', not starting with a digit)", lineNum)
 		}
 
-		entries = append(entries, Entry{Key: key, Value: value})
+		entries = append(entries, Entry{Key: key, Value: parseValue(strings.TrimSpace(parts[1]))})
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -70,4 +66,34 @@ func ParseFile(path string) ([]Entry, error) {
 	}
 
 	return entries, nil
+}
+
+// validKey matches names that are valid environment variable names.
+var validKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// parseValue strips surrounding quotes and a trailing comment ("#" after
+// whitespace, or after the closing quote) from a trimmed raw value.
+func parseValue(raw string) string {
+	if len(raw) >= 2 && (raw[0] == '"' || raw[0] == '\'') {
+		q := raw[0]
+		// Prefer the last closing quote so values with escaped quotes keep
+		// their content; a later quote inside the comment falls back to an earlier one.
+		for end := len(raw) - 1; end > 0; end-- {
+			if raw[end] != q {
+				continue
+			}
+			rest := strings.TrimSpace(raw[end+1:])
+			if rest == "" || strings.HasPrefix(rest, "#") {
+				return raw[1:end]
+			}
+		}
+		return raw
+	}
+
+	for i := 1; i < len(raw); i++ {
+		if raw[i] == '#' && (raw[i-1] == ' ' || raw[i-1] == '\t') {
+			return strings.TrimSpace(raw[:i])
+		}
+	}
+	return raw
 }
