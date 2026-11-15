@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -90,8 +91,14 @@ func setKeyring(t *testing.T, namespace, key, value string) {
 // runCred executes the cred binary with the given args and config dir.
 // Returns stdout, stderr, and any error.
 func runCred(configDir string, args ...string) (stdout, stderr string, err error) {
+	return runCredWithEnv(configDir, nil, args...)
+}
+
+// runCredWithEnv is runCred with extra KEY=VALUE entries in cred's environment.
+func runCredWithEnv(configDir string, extraEnv []string, args ...string) (stdout, stderr string, err error) {
 	cmd := exec.Command(credBin, args...)
 	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+configDir)
+	cmd.Env = append(cmd.Env, extraEnv...)
 
 	var outBuf, errBuf strings.Builder
 	cmd.Stdout = &outBuf
@@ -356,5 +363,108 @@ func TestEnvOverride(t *testing.T) {
 	got := parseOutput(outBuf.String())
 	if got[key] != secret {
 		t.Errorf("got %q, want %q (keyring should override existing env)", got[key], secret)
+	}
+}
+
+// refConfig returns a config whose default namespace holds otherKey, so tests
+// can check that references alone do not inject the default namespace.
+func refConfig(otherKey string) *config.Config {
+	return &config.Config{
+		Version: 1,
+		Default: testNamespace,
+		Namespaces: map[string]config.Namespace{
+			testNamespace: {Keys: map[string]config.KeyMeta{
+				otherKey: {},
+			}},
+		},
+	}
+}
+
+// TestReferenceResolution verifies:
+// - A cred:// reference in the environment is replaced with the keyring value
+// - The variable name may differ from the keyring key
+// - Without -n, the default namespace is not injected
+// - stdout contains only the command's output (cred writes to stderr)
+func TestReferenceResolution(t *testing.T) {
+	const refKey = "TEST_REF_KEY"
+	const refSecret = "ref-secret-value"
+	const otherKey = "TEST_REF_OTHER_KEY"
+
+	configDir := setupConfig(t, refConfig(otherKey))
+	setKeyring(t, testNamespace, refKey, refSecret)
+	setKeyring(t, testNamespace, otherKey, "other-value")
+
+	extra := []string{"API_TOKEN=cred://" + testNamespace + "/" + refKey}
+	stdout, stderr, err := runCredWithEnv(configDir, extra, "run", "--", testcredBin, "API_TOKEN", otherKey)
+	if err != nil {
+		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
+	}
+
+	want := "API_TOKEN=" + refSecret + "\n" + otherKey + "=\n"
+	if stdout != want {
+		t.Errorf("stdout = %q, want %q", stdout, want)
+	}
+	if !strings.Contains(stderr, "Resolved 1 reference(s)") {
+		t.Errorf("stderr should report resolution: %s", stderr)
+	}
+	if strings.Contains(stderr, refSecret) {
+		t.Errorf("stderr leaks the secret: %s", stderr)
+	}
+}
+
+// TestReferenceFailureDoesNotRun verifies:
+// - An unresolvable reference stops cred with exit code 1
+// - The command is not started (no stdout)
+// - stderr names the variable and the reference
+func TestReferenceFailureDoesNotRun(t *testing.T) {
+	configDir := setupConfig(t, refConfig("TEST_REF_UNUSED"))
+
+	ref := "cred://" + testNamespace + "/TEST_REF_DOES_NOT_EXIST"
+	stdout, stderr, err := runCredWithEnv(configDir, []string{"API_TOKEN=" + ref}, "run", "--", testcredBin, "API_TOKEN")
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+		t.Fatalf("want exit code 1, got %v\nstderr: %s", err, stderr)
+	}
+	if stdout != "" {
+		t.Errorf("command should not run, got stdout %q", stdout)
+	}
+	if !strings.Contains(stderr, "API_TOKEN") || !strings.Contains(stderr, ref) {
+		t.Errorf("stderr should name the variable and reference: %s", stderr)
+	}
+}
+
+// TestEnvFileReference verifies:
+// - --env-file values are passed through, and references in them are resolved
+// - Without -n, the default namespace is not injected
+func TestEnvFileReference(t *testing.T) {
+	const refKey = "TEST_ENVFILE_REF_KEY"
+	const refSecret = "envfile-secret-value"
+	const otherKey = "TEST_ENVFILE_OTHER_KEY"
+
+	configDir := setupConfig(t, refConfig(otherKey))
+	setKeyring(t, testNamespace, refKey, refSecret)
+	setKeyring(t, testNamespace, otherKey, "other-value")
+
+	envFile := filepath.Join(t.TempDir(), ".env.cred")
+	content := "API_TOKEN=\"cred://" + testNamespace + "/" + refKey + "\"\nPLAIN=plain-value\n"
+	if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runCred(configDir, "run", "--env-file", envFile, "--", testcredBin, "API_TOKEN", "PLAIN", otherKey)
+	if err != nil {
+		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
+	}
+
+	got := parseOutput(stdout)
+	if got["API_TOKEN"] != refSecret {
+		t.Errorf("API_TOKEN = %q, want %q", got["API_TOKEN"], refSecret)
+	}
+	if got["PLAIN"] != "plain-value" {
+		t.Errorf("PLAIN = %q, want plain-value", got["PLAIN"])
+	}
+	if got[otherKey] != "" {
+		t.Errorf("%s should not be injected, got %q", otherKey, got[otherKey])
 	}
 }
