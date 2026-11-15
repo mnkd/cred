@@ -37,3 +37,7 @@ Breaking changes in between, checked against the release notes:
 - CI on the PR passes without the Node.js 20 deprecation annotation
 - govulncheck runs on the PR because its workflow file changes
 - The release workflow is checked on the next tag
+
+## Follow-up: pin the GoReleaser major version
+
+The first release with goreleaser-action v7 warned: "You are using 'latest' as default version. Will lock to '~> v2'." The action resolves `latest` to `~> v2` anyway, so set `version: '~> v2'` in `release.yml`, as the action's README does. A future GoReleaser v3 is then adopted on purpose, not on the next tag.
