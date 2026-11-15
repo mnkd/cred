@@ -1,4 +1,4 @@
-// Package env handles .env file parsing for import functionality.
+// Package env parses .env files for cred import and cred run --env-file.
 package env
 
 import (
@@ -48,7 +48,7 @@ func ParseFile(path string) ([]Entry, error) {
 		// Split on first '='
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("line %d: invalid format (expected KEY=VALUE): %s", lineNum, line)
+			return nil, fmt.Errorf("line %d: invalid format (expected KEY=VALUE)", lineNum)
 		}
 
 		key := strings.TrimSpace(parts[0])

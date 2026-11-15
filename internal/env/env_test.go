@@ -3,6 +3,7 @@ package env
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -92,6 +93,21 @@ func TestParseFile_InvalidFormat(t *testing.T) {
 	_, err := ParseFile(path)
 	if err == nil {
 		t.Fatal("expected error for invalid format")
+	}
+}
+
+func TestParseFile_InvalidFormatDoesNotEchoLine(t *testing.T) {
+	// A line without "=" may be a bare secret; it must not appear in the error.
+	path := writeTempEnv(t, "sk-secret-value\n")
+	_, err := ParseFile(path)
+	if err == nil {
+		t.Fatal("expected error for invalid format")
+	}
+	if strings.Contains(err.Error(), "sk-secret-value") {
+		t.Errorf("error leaks line content: %v", err)
+	}
+	if !strings.Contains(err.Error(), "line 1") {
+		t.Errorf("error should include the line number: %v", err)
 	}
 }
 
