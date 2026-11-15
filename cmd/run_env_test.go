@@ -219,7 +219,7 @@ func TestBuildRunEnv_ResolutionFailureReportsAll(t *testing.T) {
 	}
 
 	out := stderr.String() + err.Error()
-	for _, want := range []string{"MISSING", "cred://work/NOPE", "BROKEN", "cred://work"} {
+	for _, want := range []string{"MISSING (cred://work/NOPE)", "BROKEN (cred://work)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output should mention %q: %s", want, out)
 		}
@@ -236,5 +236,37 @@ func TestBuildRunEnv_EnvFileNotFound(t *testing.T) {
 	}, io.Discard)
 	if err == nil {
 		t.Fatal("expected error for missing env file")
+	}
+}
+
+func TestBuildRunEnv_FailedReferenceLookedUpOnce(t *testing.T) {
+	calls := stubSecrets(t, nil)
+
+	_, err := buildRunEnv(runEnvInput{
+		Environ: []string{"A=cred://work/NOPE", "B=cred://work/NOPE"},
+	}, io.Discard)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if calls["cred:work/NOPE"] != 1 {
+		t.Errorf("failing reference fetched %d times, want 1", calls["cred:work/NOPE"])
+	}
+}
+
+func TestBuildRunEnv_NoSuccessMessagesOnFailure(t *testing.T) {
+	stubSecrets(t, map[string]string{"cred:prod/NS_ONLY": "ns-only"})
+
+	var stderr strings.Builder
+	_, err := buildRunEnv(runEnvInput{
+		Environ:           []string{"A=cred://work/NOPE"},
+		Namespace:         "prod",
+		NamespaceKeys:     []string{"NS_ONLY"},
+		NamespaceExplicit: true,
+	}, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(stderr.String(), "Injected") {
+		t.Errorf("stderr should not report injection when the command is not started: %s", stderr.String())
 	}
 }

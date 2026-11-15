@@ -3,6 +3,7 @@ package ref
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 )
 
@@ -10,7 +11,10 @@ import (
 const Prefix = "cred://"
 
 // ErrInvalid is returned for values that start with Prefix but are malformed.
-var ErrInvalid = errors.New("invalid reference (expected cred://<namespace>/<KEY>)")
+var ErrInvalid = errors.New("invalid reference (expected cred://<namespace>/<KEY> using letters, digits, '_', '.' and '-')")
+
+// validName matches a namespace or key name inside a reference.
+var validName = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
 // Ref points to a secret stored under a namespace and key.
 type Ref struct {
@@ -35,7 +39,7 @@ func Parse(value string) (Ref, error) {
 		return Ref{}, ErrInvalid
 	}
 	ns, key, ok := strings.Cut(strings.TrimPrefix(value, Prefix), "/")
-	if !ok || ns == "" || key == "" || strings.Contains(key, "/") {
+	if !ok || !validName.MatchString(ns) || !validName.MatchString(key) {
 		return Ref{}, ErrInvalid
 	}
 	return Ref{Namespace: ns, Key: key}, nil

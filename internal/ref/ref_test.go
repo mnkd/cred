@@ -41,6 +41,9 @@ func TestParse_Invalid(t *testing.T) {
 		"cred://work/",
 		"cred:///TOKEN",
 		"cred://a/b/c",
+		"cred://work/TOKEN # jira",
+		"cred://wo rk/TOKEN",
+		"cred://work/TO$KEN",
 		"CRED://work/TOKEN",
 		"plain-value",
 		"",
@@ -49,5 +52,15 @@ func TestParse_Invalid(t *testing.T) {
 		if _, err := Parse(v); err == nil {
 			t.Errorf("Parse(%q): expected error", v)
 		}
+	}
+}
+
+func TestParse_AllowedCharacters(t *testing.T) {
+	r, err := Parse("cred://my-project.v2/api_key-1.prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Namespace != "my-project.v2" || r.Key != "api_key-1.prod" {
+		t.Errorf("got %+v", r)
 	}
 }

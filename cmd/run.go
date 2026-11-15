@@ -113,9 +113,11 @@ func buildRunEnv(in runEnvInput, stderr io.Writer) ([]string, error) {
 
 	// Without -n, references or env files mean the caller chose exactly what
 	// to pass, so the default namespace is not injected wholesale.
-	if in.NamespaceExplicit || (!hasReference(environ) && len(in.EnvFiles) == 0) {
+	injectNS := in.NamespaceExplicit || (!hasReference(environ) && len(in.EnvFiles) == 0)
+	injected := 0
+	if injectNS {
 		var err error
-		environ, err = injectNamespace(environ, in.Namespace, in.NamespaceKeys, stderr)
+		environ, injected, err = injectNamespace(environ, in.Namespace, in.NamespaceKeys, stderr)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +127,20 @@ func buildRunEnv(in runEnvInput, stderr io.Writer) ([]string, error) {
 		environ = setEnv(environ, e.Key, e.Value)
 	}
 
-	return resolveReferences(environ, stderr)
+	environ, resolved, err := resolveReferences(environ, stderr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Report only after everything succeeded, so a run that does not start
+	// the command never claims that credentials were injected.
+	if injectNS {
+		fmt.Fprintf(stderr, "→ Injected %d credential(s) from namespace %q\n", injected, in.Namespace)
+	}
+	if resolved > 0 {
+		fmt.Fprintf(stderr, "→ Resolved %d reference(s)\n", resolved)
+	}
+	return environ, nil
 }
 
 func hasReference(environ []string) bool {
@@ -137,7 +152,7 @@ func hasReference(environ []string) bool {
 	return false
 }
 
-func injectNamespace(environ []string, ns string, keys []string, stderr io.Writer) ([]string, error) {
+func injectNamespace(environ []string, ns string, keys []string, stderr io.Writer) ([]string, int, error) {
 	if len(keys) == 0 {
 		fmt.Fprintf(stderr, "⚠ No credentials in namespace %q, running without injection\n", ns)
 	}
@@ -151,20 +166,24 @@ func injectNamespace(environ []string, ns string, keys []string, stderr io.Write
 				fmt.Fprintf(stderr, "⚠ Skipping %s: not found in keyring\n", key)
 				continue
 			}
-			return nil, fmt.Errorf("failed to retrieve %s: %w", key, err)
+			return nil, 0, fmt.Errorf("failed to retrieve %s: %w", key, err)
 		}
 		environ = setEnv(environ, key, value)
 		injected++
 	}
-
-	fmt.Fprintf(stderr, "→ Injected %d credential(s) from namespace %q\n", injected, ns)
-	return environ, nil
+	return environ, injected, nil
 }
 
-// resolveReferences replaces every cred:// value with its secret. Resolved
-// values are not resolved again. All failures are reported before returning.
-func resolveReferences(environ []string, stderr io.Writer) ([]string, error) {
-	cache := map[string]string{}
+// resolveReferences replaces every cred:// value with its secret and returns
+// the number of variables resolved. Resolved values are not resolved again.
+// Each distinct reference is looked up once, including failed ones, and all
+// failures are reported before returning.
+func resolveReferences(environ []string, stderr io.Writer) ([]string, int, error) {
+	type lookup struct {
+		secret string
+		err    error
+	}
+	cache := map[string]lookup{}
 	resolved, failed := 0, 0
 
 	for i, entry := range environ {
@@ -173,31 +192,29 @@ func resolveReferences(environ []string, stderr io.Writer) ([]string, error) {
 			continue
 		}
 
-		secret, cached := cache[value]
+		res, cached := cache[value]
 		if !cached {
 			r, err := ref.Parse(value)
 			if err == nil {
-				secret, err = getSecret(keyring.ServiceName(r.Namespace), r.Key)
+				res.secret, err = getSecret(keyring.ServiceName(r.Namespace), r.Key)
 			}
-			if err != nil {
-				fmt.Fprintf(stderr, "✗ Cannot resolve %s (%s): %s\n", name, value, describeResolveError(err))
-				failed++
-				continue
-			}
-			cache[value] = secret
+			res.err = err
+			cache[value] = res
+		}
+		if res.err != nil {
+			fmt.Fprintf(stderr, "✗ Cannot resolve %s (%s): %s\n", name, value, describeResolveError(res.err))
+			failed++
+			continue
 		}
 
-		environ[i] = name + "=" + secret
+		environ[i] = name + "=" + res.secret
 		resolved++
 	}
 
 	if failed > 0 {
-		return nil, fmt.Errorf("failed to resolve %d reference(s); command not started", failed)
+		return nil, 0, fmt.Errorf("failed to resolve %d reference(s); command not started", failed)
 	}
-	if resolved > 0 {
-		fmt.Fprintf(stderr, "→ Resolved %d reference(s)\n", resolved)
-	}
-	return environ, nil
+	return environ, resolved, nil
 }
 
 func describeResolveError(err error) string {

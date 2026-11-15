@@ -22,7 +22,7 @@ Like `op run`, configs hold only references (`cred://<namespace>/<KEY>`), and `c
 
 - `cred://<namespace>/<KEY>`
   - The scheme is case-sensitive
-  - `<namespace>` and `<KEY>` are non-empty and contain no `/`. Exactly one `/` separates them
+  - `<namespace>` and `<KEY>` are non-empty and use only letters, digits, `_`, `.` and `-`. Exactly one `/` separates them
 - A value that starts with `cred://` but does not match is a parse error. It is never passed through as-is
 - The environment variable name may differ from `<KEY>` (e.g. `API_TOKEN=cred://work/JIRA_TOKEN`)
 - No escape mechanism, no variable expansion inside references
@@ -31,6 +31,8 @@ Like `op run`, configs hold only references (`cred://<namespace>/<KEY>`), and `c
 
 - `cred run --env-file <path> [--env-file <path>...] -- <command>`
 - Parsed by the existing `env.ParseFile` (blank lines, `#` comments, surrounding quotes, `export ` prefix)
+- A `#` after whitespace, or after the closing quote, starts an inline comment. Without this, `KEY="cred://ns/K" # note` keeps its quotes and passes through unresolved
+- `KEY` must be a valid environment variable name (`^[A-Za-z_][A-Za-z0-9_]*$`). Other keys are an error with the line number
 - A file that cannot be read stops cred before exec
 
 ### Building the environment
@@ -47,7 +49,7 @@ Layers are applied in this order. Later layers win.
 ### Errors
 
 - If any reference fails to parse or resolve, cred does not exec and exits with code 1
-- All references are attempted, then all failures are reported together:
+- All references are attempted, then all failures are reported together. Each distinct reference is looked up once, even when it fails:
   - `✗ Cannot resolve API_TOKEN (cred://work/JIRA_TOKEN): not found in keyring`
 - Failure reasons: not found, Keychain timed out or access denied, other Keychain error
 - Messages contain only variable names and references, never values
@@ -58,6 +60,7 @@ Layers are applied in this order. Later layers win.
 - All cred messages go to stderr. stdout belongs to the command (MCP stdio servers use it for JSON-RPC)
 - When references are resolved: `→ Resolved N reference(s)`
 - `→ Injected N credential(s) from namespace ...` is printed only when namespace injection runs
+- Both are printed only after every reference is resolved, so a run that does not start the command never reports an injection
 - The command's stdout / stderr are not touched (no masking)
 
 ### Command lookup
@@ -67,7 +70,7 @@ Layers are applied in this order. Later layers win.
 ## Changes
 
 1. `internal/ref/` — new package: parse references
-2. `internal/env/env.go` — the invalid-line error no longer echoes the line content (it may hold a secret)
+2. `internal/env/env.go` — the invalid-line error no longer echoes the line content (it may hold a secret); inline comments; key validation
 3. `cmd/run.go` — `--env-file` flag; extract environment building into `buildRunEnv`; keyring access through a replaceable variable for tests
 4. `cmd/run_test.go` — unit tests for precedence, namespace-injection rules, and failure
 5. `integration/integration_test.go` — reference resolution, no exec on failure, default namespace not injected with references

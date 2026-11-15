@@ -175,6 +175,7 @@ API_TOKEN=cred://work/JIRA_TOKEN cred run -- ./sync.sh
 ```
 
 - `<namespace>` and `<KEY>` are the names used with `cred set -n <namespace> <KEY>`
+  - They may contain letters, digits, `_`, `.` and `-`
 - A value that starts with `cred://` but is not in this form is an error
 - Without `-n`, using references (or `--env-file`) turns off namespace injection
   - Only the referenced secrets reach the command
@@ -186,7 +187,7 @@ Load variables from a dotenv file. Values may be plain values or references, lik
 
 ```bash
 # .env.cred
-API_TOKEN="cred://work/JIRA_TOKEN"
+API_TOKEN="cred://work/JIRA_TOKEN"  # Jira
 LOG_LEVEL=debug
 ```
 
@@ -196,7 +197,9 @@ cred run --env-file .env.cred -- python my_script.py
 
 - One `KEY=value` per line
   - Blank lines and lines starting with `#` are skipped
+  - A `#` after whitespace, or after the closing quote, starts a comment
   - Surrounding `"` / `'` are removed, and an `export ` prefix is allowed
+  - `KEY` must be a valid environment variable name (letters, digits and `_`, not starting with a digit)
 - `--env-file` can be repeated. Later files win
 
 #### Precedence and errors
@@ -229,7 +232,7 @@ Codex (`~/.codex/config.toml`):
 [mcp_servers.example]
 command = "/opt/homebrew/bin/cred"
 args = ["run", "--", "/opt/homebrew/bin/npx", "-y", "example-mcp-server@1.2.3"]
-env = { EXAMPLE_TOKEN = "cred://work/EXAMPLE_TOKEN" }
+env = { EXAMPLE_TOKEN = "cred://work/EXAMPLE_TOKEN", PATH = "/opt/homebrew/bin:/usr/bin:/bin" }
 ```
 
 Claude Code (an entry under `mcpServers` in `.mcp.json` or `~/.claude.json`):
@@ -238,7 +241,10 @@ Claude Code (an entry under `mcpServers` in `.mcp.json` or `~/.claude.json`):
 "example": {
   "command": "/opt/homebrew/bin/cred",
   "args": ["run", "--", "/opt/homebrew/bin/npx", "-y", "example-mcp-server@1.2.3"],
-  "env": { "EXAMPLE_TOKEN": "cred://work/EXAMPLE_TOKEN" }
+  "env": {
+    "EXAMPLE_TOKEN": "cred://work/EXAMPLE_TOKEN",
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin"
+  }
 }
 ```
 
@@ -246,7 +252,9 @@ Claude Code (an entry under `mcpServers` in `.mcp.json` or `~/.claude.json`):
   - `/opt/homebrew/bin` is the Homebrew prefix on Apple Silicon
 - Desktop apps start MCP servers with a minimal `PATH`
   - `cred run` looks up the command in its own `PATH`, so use an absolute path for the command too
-  - If the command is a script such as `npx` that needs `node`, also set `PATH` in `env`
+  - `npx` starts with `#!/usr/bin/env node`, so the examples set `PATH` in `env` to let it find `node`
+- Write `--env-file` paths as absolute paths too
+  - A relative path is resolved against the client's working directory, which differs between a terminal and a desktop app
 
 ### `cred namespace` — Namespace management
 
