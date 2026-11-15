@@ -294,3 +294,22 @@ func TestBuildRunEnv_MistypedReferenceFails(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildRunEnv_ServiceNameLikeValuePassesThrough(t *testing.T) {
+	// "cred:<namespace>" is cred's keychain service-name format, not a mistyped reference.
+	stubSecrets(t, map[string]string{"cred:work/NS_ONLY": "ns-only"})
+
+	got, err := buildRunEnv(runEnvInput{
+		Environ:           []string{"CRED_SERVICE=cred:work"},
+		Namespace:         "work",
+		NamespaceKeys:     []string{"NS_ONLY"},
+		NamespaceExplicit: true,
+	}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := envMap(got)
+	if m["CRED_SERVICE"] != "cred:work" || m["NS_ONLY"] != "ns-only" {
+		t.Errorf("got CRED_SERVICE=%q NS_ONLY=%q", m["CRED_SERVICE"], m["NS_ONLY"])
+	}
+}

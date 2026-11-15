@@ -11,17 +11,18 @@ Feedback on 0.2.0:
 
 ## Solution
 
-1. Treat any value that starts with `cred:` or `cred//` as a reference
+1. Treat any value that starts with `cred:/` or `cred//` as a reference
    - It must then parse as `cred://<namespace>/<KEY>`, or cred exits 1 without starting the command
    - Because it counts as a reference, it also turns off default namespace injection
-   - A value that legitimately starts with `cred:` cannot be passed through `cred run`. This is accepted: such values are unlikely, and a silent typo is the larger risk
+   - A value that legitimately starts with `cred:/` or `cred//` cannot be passed through `cred run`. This is accepted: such values are unlikely, and a silent typo is the larger risk
+   - A bare `cred:` prefix is not enough. `cred:<namespace>` is the keychain service-name format and may appear in unrelated inherited variables, which would stop every `cred run`, even with `-n`. The cost is that `cred:work/KEY` (both slashes missing) is still passed as a plain value
 2. Set `SilenceErrors` on the root command so only `main.go` prints errors. `main.go` keeps the `Error:` prefix
 
 Making namespace injection require `-n` (so a forgotten reference also fails) would break `cred run -- python app.py`, and is left for a separate decision.
 
 ## Changes
 
-1. `internal/ref/ref.go` — `IsRef` matches `cred:` and `cred//`; `Parse` still requires `cred://`
+1. `internal/ref/ref.go` — `IsRef` matches `cred:/` and `cred//`; `Parse` still requires `cred://`
 2. `cmd/root.go` — `SilenceErrors: true`
 3. `main.go` — print `Error: <err>`
 4. Tests and README

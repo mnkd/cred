@@ -28,11 +28,13 @@ func (r Ref) String() string {
 }
 
 // IsRef reports whether value should be treated as a reference.
-// Values that only look like one ("cred:" or "cred//", e.g. a missing slash
+// Values that only look like one ("cred:/" or "cred//", i.e. a missing slash
 // or colon) count too, so Parse rejects the typo instead of passing it on as
-// a plain value. The scheme is case-sensitive.
+// a plain value. A bare "cred:" prefix is not enough: "cred:<namespace>" is
+// the keychain service-name format and may appear in unrelated variables.
+// The scheme is case-sensitive.
 func IsRef(value string) bool {
-	return strings.HasPrefix(value, "cred:") || strings.HasPrefix(value, "cred//")
+	return strings.HasPrefix(value, "cred:/") || strings.HasPrefix(value, "cred//")
 }
 
 // Parse parses a cred://<namespace>/<KEY> reference.
