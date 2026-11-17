@@ -11,17 +11,33 @@ builds:
     ldflags:
       - -s -w -X github.com/mnkd/cred/cmd.version={{.Version}}
 
-archives:
-  - format: tar.gz
+# Homebrew quarantines cask downloads, so Gatekeeper rejects the binary unless
+# it is signed with a Developer ID and notarized. Not gated on isEnvSet: a
+# release without the secrets must fail rather than publish a blocked cask.
+# Snapshot builds skip notarization.
+notarize:
+  macos:
+    - enabled: true
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        timeout: 20m
 
-brews:
+archives:
+  - formats: [tar.gz]
+
+homebrew_casks:
   - repository:
       owner: mnkd
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: "https://github.com/mnkd/cred"
     description: "A CLI tool for managing API keys via macOS Keychain"
-    license: "MIT"
 
 changelog:
   sort: asc
