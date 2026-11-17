@@ -40,6 +40,49 @@ Mask secrets in the command's stdout and stderr by default, and offer `--no-mask
   - After the command exits, it reads until the pipes have been silent for 1 second, so a background process that inherited them cannot keep cred alive
 - With `--no-masking`, or when no value is long enough to mask, cred still replaces itself via `syscall.Exec`
 
+### Choosing the path
+
+```mermaid
+flowchart TD
+    start["cred run -- COMMAND"] --> env["Build the environment<br/>(inherited env, namespace, --env-file, references)"]
+    env --> flag{"--no-masking?"}
+    flag -->|yes| exec["syscall.Exec<br/>cred becomes the command"]
+    flag -->|no| values{"Any keychain value<br/>of 8 bytes or more?"}
+    values -->|no| exec
+    values -->|yes| child["Start the command as a child<br/>and mask its output"]
+```
+
+### A masked run
+
+```mermaid
+sequenceDiagram
+    participant Caller as Caller (terminal or MCP client)
+    participant Cred as cred
+    participant Child as Command
+    Caller->>Cred: start, stdin
+    Cred->>Child: start with secrets in env<br/>stdin passed as is, stdout/stderr as pipes
+    loop while the command runs
+        Child->>Cred: output chunk (pipe)
+        Cred->>Caller: chunk with secrets replaced<br/>(a possible secret prefix at the end is held back)
+        Caller-->>Cred: signal (SIGINT, SIGTERM, ...)
+        Cred-->>Child: forward the signal
+    end
+    Child->>Cred: exit (code or signal n)
+    Cred->>Caller: remaining output until the pipes are silent for 1 s
+    Cred->>Caller: exit with the code, or 128 + n
+```
+
+### A secret split across two reads
+
+With the secret `s3cr3t-value`, the first read ends with `s3cr`, which could be its start, so only that tail is held back:
+
+```text
+read 1:   token=s3cr          -> writes "token="           holds "s3cr"
+read 2:   3t-value\n          -> "s3cr3t-value\n" matches  writes "<concealed by cred>\n"
+```
+
+A read that ends with a newline has no such tail, so a JSON-RPC message is written as soon as it is read.
+
 ## Rationale
 
 - Agents and MCP clients are the main users of `cred run`, and they rarely change the flags of a configured command. Only a default protects them
