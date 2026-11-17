@@ -79,7 +79,7 @@ Examples:
 			keys = sortedKeys(nsConfig.Keys)
 		}
 
-		runEnv, err := buildRunEnv(runEnvInput{
+		prepared, err := buildRunEnv(runEnvInput{
 			Environ:           os.Environ(),
 			Namespace:         ns,
 			NamespaceKeys:     keys,
@@ -96,8 +96,8 @@ Examples:
 			return fmt.Errorf("command not found: %s", args[0])
 		}
 
-		if !noMasking && len(mask.Values(runEnv.Secrets)) > 0 {
-			code, err := runMasked(binary, args, runEnv.Environ, runEnv.Secrets,
+		if !noMasking && len(mask.Values(prepared.Secrets)) > 0 {
+			code, err := runMasked(binary, args, prepared.Environ, prepared.Secrets,
 				childIO{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
 			if err != nil {
 				return err
@@ -111,7 +111,7 @@ Examples:
 		// Nothing to mask: replace current process with the command (exec),
 		// so it keeps the terminal, and the exit code and signals belong to
 		// it without a supervising parent.
-		return syscall.Exec(binary, args, runEnv.Environ)
+		return syscall.Exec(binary, args, prepared.Environ)
 	},
 }
 
