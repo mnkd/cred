@@ -14,11 +14,15 @@ import (
 	"github.com/mnkd/cred/internal/config"
 	"github.com/mnkd/cred/internal/env"
 	"github.com/mnkd/cred/internal/keyring"
+	"github.com/mnkd/cred/internal/mask"
 	"github.com/mnkd/cred/internal/ref"
 	"github.com/spf13/cobra"
 )
 
-var envFiles []string
+var (
+	envFiles  []string
+	noMasking bool
+)
 
 // getSecret is replaced in tests.
 var getSecret = keyring.Get
@@ -42,6 +46,14 @@ Precedence (later wins): inherited environment, namespace injection,
 --env-file in the order given. References are resolved after merging.
 If any reference cannot be resolved, the command is not started.
 
+Masking: secrets read from the keyring are replaced with
+<concealed by cred> in the command's stdout and stderr. Secrets shorter than
+8 bytes are not masked. The command's stdout and stderr are then pipes, not
+a terminal, so some commands drop colors or interactive output; output that
+does not end with a newline may be held back while it could be the start of
+a secret. --no-masking turns masking off and runs the command as before.
+Masking prevents accidental disclosure; it is not a security boundary.
+
 All cred messages go to stderr; stdout belongs to the command.
 
 Examples:
@@ -49,7 +61,8 @@ Examples:
   cred run -n production -- ./deploy.sh                  # Inject a namespace
   API_TOKEN=cred://work/JIRA_TOKEN cred run -- ./sync.sh # Resolve a reference
   cred run --env-file .env.cred -- python app.py         # References in a file
-  cred run -- env | grep OPENAI                          # Verify injection
+  cred run -- env | grep OPENAI                          # Verify injection (value concealed)
+  cred run --no-masking -- ./interactive-tool            # Keep the terminal
   cred run -- sh -c 'echo $API_KEY && python app.py'     # Multiple commands`,
 	Args:         cobra.MinimumNArgs(1),
 	SilenceUsage: true,
@@ -66,7 +79,7 @@ Examples:
 			keys = sortedKeys(nsConfig.Keys)
 		}
 
-		environ, err := buildRunEnv(runEnvInput{
+		runEnv, err := buildRunEnv(runEnvInput{
 			Environ:           os.Environ(),
 			Namespace:         ns,
 			NamespaceKeys:     keys,
@@ -83,9 +96,22 @@ Examples:
 			return fmt.Errorf("command not found: %s", args[0])
 		}
 
-		// Replace current process with the command (exec), so the exit code
-		// and signals belong to the command without a supervising parent.
-		return syscall.Exec(binary, args, environ)
+		if !noMasking && len(mask.Values(runEnv.Secrets)) > 0 {
+			code, err := runMasked(binary, args, runEnv.Environ, runEnv.Secrets,
+				childIO{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
+			if err != nil {
+				return err
+			}
+			if code != 0 {
+				return &ExitCodeError{Code: code}
+			}
+			return nil
+		}
+
+		// Nothing to mask: replace current process with the command (exec),
+		// so it keeps the terminal, and the exit code and signals belong to
+		// it without a supervising parent.
+		return syscall.Exec(binary, args, runEnv.Environ)
 	},
 }
 
@@ -98,15 +124,21 @@ type runEnvInput struct {
 	EnvFiles          []string // --env-file paths in order
 }
 
+// runEnv is the environment for the command and the secrets it contains.
+type runEnv struct {
+	Environ []string // KEY=VALUE entries for the command
+	Secrets []string // every value read from the keyring, unfiltered
+}
+
 // buildRunEnv merges the inherited environment, namespace injection and
 // env files (later wins), then resolves cred:// references once.
 // Messages go to stderr; secret values are never written.
-func buildRunEnv(in runEnvInput, stderr io.Writer) ([]string, error) {
+func buildRunEnv(in runEnvInput, stderr io.Writer) (runEnv, error) {
 	var fileEntries []env.Entry
 	for _, path := range in.EnvFiles {
 		entries, err := env.ParseFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("--env-file %s: %w", path, err)
+			return runEnv{}, fmt.Errorf("--env-file %s: %w", path, err)
 		}
 		fileEntries = append(fileEntries, entries...)
 	}
@@ -116,12 +148,12 @@ func buildRunEnv(in runEnvInput, stderr io.Writer) ([]string, error) {
 	// Without -n, references or env files mean the caller chose exactly what
 	// to pass, so the default namespace is not injected wholesale.
 	injectNS := in.NamespaceExplicit || (!hasReference(environ) && len(in.EnvFiles) == 0)
-	injected := 0
+	var nsSecrets []string
 	if injectNS {
 		var err error
-		environ, injected, err = injectNamespace(environ, in.Namespace, in.NamespaceKeys, stderr)
+		environ, nsSecrets, err = injectNamespace(environ, in.Namespace, in.NamespaceKeys, stderr)
 		if err != nil {
-			return nil, err
+			return runEnv{}, err
 		}
 	}
 
@@ -129,20 +161,20 @@ func buildRunEnv(in runEnvInput, stderr io.Writer) ([]string, error) {
 		environ = setEnv(environ, e.Key, e.Value)
 	}
 
-	environ, resolved, err := resolveReferences(environ, stderr)
+	environ, refSecrets, err := resolveReferences(environ, stderr)
 	if err != nil {
-		return nil, err
+		return runEnv{}, err
 	}
 
 	// Report only after everything succeeded, so a run that does not start
 	// the command never claims that credentials were injected.
 	if injectNS {
-		fmt.Fprintf(stderr, "→ Injected %d credential(s) from namespace %q\n", injected, in.Namespace)
+		fmt.Fprintf(stderr, "→ Injected %d credential(s) from namespace %q\n", len(nsSecrets), in.Namespace)
 	}
-	if resolved > 0 {
-		fmt.Fprintf(stderr, "→ Resolved %d reference(s)\n", resolved)
+	if len(refSecrets) > 0 {
+		fmt.Fprintf(stderr, "→ Resolved %d reference(s)\n", len(refSecrets))
 	}
-	return environ, nil
+	return runEnv{Environ: environ, Secrets: append(nsSecrets, refSecrets...)}, nil
 }
 
 func hasReference(environ []string) bool {
@@ -154,13 +186,14 @@ func hasReference(environ []string) bool {
 	return false
 }
 
-func injectNamespace(environ []string, ns string, keys []string, stderr io.Writer) ([]string, int, error) {
+// injectNamespace sets every key of ns and returns the values it read.
+func injectNamespace(environ []string, ns string, keys []string, stderr io.Writer) ([]string, []string, error) {
 	if len(keys) == 0 {
 		fmt.Fprintf(stderr, "⚠ No credentials in namespace %q, running without injection\n", ns)
 	}
 
 	service := keyring.ServiceName(ns)
-	injected := 0
+	var secrets []string
 	for _, key := range keys {
 		value, err := getSecret(service, key)
 		if err != nil {
@@ -168,25 +201,26 @@ func injectNamespace(environ []string, ns string, keys []string, stderr io.Write
 				fmt.Fprintf(stderr, "⚠ Skipping %s: not found in keyring\n", key)
 				continue
 			}
-			return nil, 0, fmt.Errorf("failed to retrieve %s: %w", key, err)
+			return nil, nil, fmt.Errorf("failed to retrieve %s: %w", key, err)
 		}
 		environ = setEnv(environ, key, value)
-		injected++
+		secrets = append(secrets, value)
 	}
-	return environ, injected, nil
+	return environ, secrets, nil
 }
 
 // resolveReferences replaces every cred:// value with its secret and returns
-// the number of variables resolved. Resolved values are not resolved again.
+// one secret per variable resolved. Resolved values are not resolved again.
 // Each distinct reference is looked up once, including failed ones, and all
 // failures are reported before returning.
-func resolveReferences(environ []string, stderr io.Writer) ([]string, int, error) {
+func resolveReferences(environ []string, stderr io.Writer) ([]string, []string, error) {
 	type lookup struct {
 		secret string
 		err    error
 	}
 	cache := map[string]lookup{}
-	resolved, failed := 0, 0
+	var secrets []string
+	failed := 0
 
 	for i, entry := range environ {
 		name, value, ok := strings.Cut(entry, "=")
@@ -210,13 +244,13 @@ func resolveReferences(environ []string, stderr io.Writer) ([]string, int, error
 		}
 
 		environ[i] = name + "=" + res.secret
-		resolved++
+		secrets = append(secrets, res.secret)
 	}
 
 	if failed > 0 {
-		return nil, 0, fmt.Errorf("failed to resolve %d reference(s); command not started", failed)
+		return nil, nil, fmt.Errorf("failed to resolve %d reference(s); command not started", failed)
 	}
-	return environ, resolved, nil
+	return environ, secrets, nil
 }
 
 func describeResolveError(err error) string {
@@ -233,6 +267,7 @@ func describeResolveError(err error) string {
 }
 
 func init() {
+	runCmd.Flags().BoolVar(&noMasking, "no-masking", false, "do not conceal secrets in the command's stdout and stderr")
 	runCmd.Flags().StringArrayVar(&envFiles, "env-file", nil, "load KEY=VALUE lines from a dotenv file (repeatable; later files win)")
 	rootCmd.AddCommand(runCmd)
 }

@@ -5,16 +5,19 @@ package integration
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/mnkd/cred/internal/config"
 	"github.com/mnkd/cred/internal/keyring"
+	"github.com/mnkd/cred/internal/mask"
 )
 
 var (
@@ -123,6 +126,7 @@ func parseOutput(s string) map[string]string {
 
 // TestSingleKeyInjection verifies:
 // - A single keyring secret is injected as an environment variable into the child process
+// - The secret is concealed in the command's output
 // - stderr reports the correct injection count ("Injected 1 credential(s)")
 func TestSingleKeyInjection(t *testing.T) {
 	const key = "TEST_SINGLE_KEY"
@@ -146,9 +150,10 @@ func TestSingleKeyInjection(t *testing.T) {
 		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
 	}
 
+	// Concealed output means the exact secret was printed.
 	got := parseOutput(stdout)
-	if got[key] != secret {
-		t.Errorf("got %q, want %q", got[key], secret)
+	if got[key] != mask.Replacement {
+		t.Errorf("got %q, want %q", got[key], mask.Replacement)
 	}
 
 	if !strings.Contains(stderr, "Injected 1 credential(s)") {
@@ -159,6 +164,7 @@ func TestSingleKeyInjection(t *testing.T) {
 // TestMultipleKeysInjection verifies:
 // - All keys registered in the namespace are injected into the child process
 // - Each key holds its correct secret value
+// - Values shorter than mask.MinLen are not masked
 // - stderr reports the correct total injection count
 func TestMultipleKeysInjection(t *testing.T) {
 	keys := map[string]string{
@@ -235,9 +241,10 @@ func TestNamespaceSelection(t *testing.T) {
 		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
 	}
 
+	// Concealed output means the exact secret was printed.
 	got := parseOutput(stdout)
-	if got[key] != secret {
-		t.Errorf("got %q, want %q", got[key], secret)
+	if got[key] != mask.Replacement {
+		t.Errorf("got %q, want %q", got[key], mask.Replacement)
 	}
 
 	if !strings.Contains(stderr, fmt.Sprintf("namespace %q", ns)) {
@@ -276,8 +283,8 @@ func TestMissingKeyInKeyring(t *testing.T) {
 	}
 
 	got := parseOutput(stdout)
-	if got[presentKey] != presentSecret {
-		t.Errorf("%s: got %q, want %q", presentKey, got[presentKey], presentSecret)
+	if got[presentKey] != mask.Replacement {
+		t.Errorf("%s: got %q, want %q", presentKey, got[presentKey], mask.Replacement)
 	}
 	if got[missingKey] != "" {
 		t.Errorf("%s: got %q, want empty", missingKey, got[missingKey])
@@ -361,8 +368,9 @@ func TestEnvOverride(t *testing.T) {
 	}
 
 	got := parseOutput(outBuf.String())
-	if got[key] != secret {
-		t.Errorf("got %q, want %q (keyring should override existing env)", got[key], secret)
+	// Concealed output means the keyring value, not the original, was printed.
+	if got[key] != mask.Replacement {
+		t.Errorf("got %q, want %q (keyring should override existing env)", got[key], mask.Replacement)
 	}
 }
 
@@ -400,7 +408,7 @@ func TestReferenceResolution(t *testing.T) {
 		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
 	}
 
-	want := "API_TOKEN=" + refSecret + "\n" + otherKey + "=\n"
+	want := "API_TOKEN=" + mask.Replacement + "\n" + otherKey + "=\n"
 	if stdout != want {
 		t.Errorf("stdout = %q, want %q", stdout, want)
 	}
@@ -439,6 +447,7 @@ func TestReferenceFailureDoesNotRun(t *testing.T) {
 
 // TestEnvFileReference verifies:
 // - --env-file values are passed through, and references in them are resolved
+// - Resolved values are concealed; plain values in the file are not
 // - Without -n, the default namespace is not injected
 func TestEnvFileReference(t *testing.T) {
 	const refKey = "TEST_ENVFILE_REF_KEY"
@@ -461,13 +470,138 @@ func TestEnvFileReference(t *testing.T) {
 	}
 
 	got := parseOutput(stdout)
-	if got["API_TOKEN"] != refSecret {
-		t.Errorf("API_TOKEN = %q, want %q", got["API_TOKEN"], refSecret)
+	if got["API_TOKEN"] != mask.Replacement {
+		t.Errorf("API_TOKEN = %q, want %q", got["API_TOKEN"], mask.Replacement)
 	}
 	if got["PLAIN"] != "plain-value" {
 		t.Errorf("PLAIN = %q, want plain-value", got["PLAIN"])
 	}
 	if got[otherKey] != "" {
 		t.Errorf("%s should not be injected, got %q", otherKey, got[otherKey])
+	}
+}
+
+// singleKeyConfig returns a config whose default namespace holds key.
+func singleKeyConfig(key string) *config.Config {
+	return &config.Config{
+		Version: 1,
+		Default: testNamespace,
+		Namespaces: map[string]config.Namespace{
+			testNamespace: {Keys: map[string]config.KeyMeta{key: {}}},
+		},
+	}
+}
+
+// TestNoMasking verifies:
+// - With --no-masking, each value is printed as is
+func TestNoMasking(t *testing.T) {
+	keys := map[string]string{
+		"TEST_NOMASK_A": "nomask-secret-a",
+		"TEST_NOMASK_B": "nomask-secret-b",
+	}
+	keysConfig := map[string]config.KeyMeta{}
+	for k, v := range keys {
+		keysConfig[k] = config.KeyMeta{}
+		setKeyring(t, testNamespace, k, v)
+	}
+	configDir := setupConfig(t, &config.Config{
+		Version:    1,
+		Default:    testNamespace,
+		Namespaces: map[string]config.Namespace{testNamespace: {Keys: keysConfig}},
+	})
+
+	stdout, stderr, err := runCred(configDir, "run", "--no-masking", "--", testcredBin, "TEST_NOMASK_A", "TEST_NOMASK_B")
+	if err != nil {
+		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
+	}
+	got := parseOutput(stdout)
+	for k, want := range keys {
+		if got[k] != want {
+			t.Errorf("%s: got %q, want %q", k, got[k], want)
+		}
+	}
+}
+
+// TestMaskedStderr verifies:
+// - A secret written to the command's stderr is concealed
+func TestMaskedStderr(t *testing.T) {
+	const key = "TEST_STDERR_KEY"
+	setKeyring(t, testNamespace, key, "stderr-secret-value")
+	configDir := setupConfig(t, singleKeyConfig(key))
+
+	_, stderr, err := runCred(configDir, "run", "--", "/bin/sh", "-c", `echo "leak=$`+key+`" >&2`)
+	if err != nil {
+		t.Fatalf("cred run failed: %v\nstderr: %s", err, stderr)
+	}
+	if strings.Contains(stderr, "stderr-secret-value") {
+		t.Errorf("stderr leaks the secret: %s", stderr)
+	}
+	if !strings.Contains(stderr, "leak="+mask.Replacement) {
+		t.Errorf("stderr should contain the concealed value: %s", stderr)
+	}
+}
+
+// TestMaskedExitCode verifies, with masking on:
+// - The command's exit code becomes cred's exit code, without an error message
+// - A command killed by signal n makes cred exit with 128+n
+func TestMaskedExitCode(t *testing.T) {
+	const key = "TEST_EXIT_KEY"
+	setKeyring(t, testNamespace, key, "exit-secret-value")
+	configDir := setupConfig(t, singleKeyConfig(key))
+
+	for _, tc := range []struct {
+		script string
+		want   int
+	}{
+		{"exit 3", 3},
+		{"kill -TERM $$", 128 + 15},
+	} {
+		_, stderr, err := runCred(configDir, "run", "--", "/bin/sh", "-c", tc.script)
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != tc.want {
+			t.Errorf("%s: want exit code %d, got %v\nstderr: %s", tc.script, tc.want, err, stderr)
+		}
+		if strings.Contains(stderr, "Error:") {
+			t.Errorf("%s: cred should not print an error: %s", tc.script, stderr)
+		}
+	}
+}
+
+// TestMaskedSignalForwarding verifies:
+// - SIGTERM sent to cred reaches the command, whose exit code cred returns
+func TestMaskedSignalForwarding(t *testing.T) {
+	const key = "TEST_SIGNAL_KEY"
+	setKeyring(t, testNamespace, key, "signal-secret-value")
+	configDir := setupConfig(t, singleKeyConfig(key))
+
+	cmd := exec.Command(credBin, "run", "--", "/bin/sh", "-c",
+		`trap 'echo got-term; exit 7' TERM; echo ready; while :; do sleep 0.05; done`)
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+configDir)
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := make([]byte, 64)
+	n, _ := out.Read(buf)
+	if !strings.Contains(string(buf[:n]), "ready") {
+		cmd.Process.Kill()
+		t.Fatalf("command did not start: %q", buf[:n])
+	}
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	rest, _ := io.ReadAll(out)
+	err = cmd.Wait()
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 7 {
+		t.Errorf("want exit code 7, got %v", err)
+	}
+	if !strings.Contains(string(rest), "got-term") {
+		t.Errorf("command should have handled SIGTERM, got %q", rest)
 	}
 }
