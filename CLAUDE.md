@@ -17,6 +17,7 @@ make install     # go install .
 - `internal/config/` — read/write ~/.config/cred/config.yml
 - `internal/env/` — .env file parser
 - `internal/mask/` — streaming replacement of secrets in `cred run` output
+- `scripts/manual-check/` — manual checks of `cred run` with MCP clients and Ctrl-C
 
 ## Coding Rules
 

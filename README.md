@@ -424,6 +424,10 @@ cred run -n work -- ./testcred AWS_ACCESS_KEY_ID
 API_TOKEN=cred://work/JIRA_TOKEN cred run -- ./testcred API_TOKEN
 ```
 
+### Manual checks with MCP clients and Ctrl-C
+
+`scripts/manual-check/` checks what the automated tests cannot: that an MCP server wrapped with `cred run` connects in Claude Code and Codex with its output masked, and that Ctrl-C stops a command under `cred run`. See [scripts/manual-check/README.md](scripts/manual-check/README.md).
+
 ## Architecture
 
 ```
@@ -445,6 +449,8 @@ cred
 │       └── main.go               # Test helper: prints env vars as KEY=VALUE
 ├── integration/
 │   └── integration_test.go       # Integration tests for cred run
+├── scripts/
+│   └── manual-check/             # Manual checks with MCP clients and Ctrl-C
 └── internal/
     ├── keyring/
     │   └── keyring.go            # OS keyring wrapper (3-second timeout)
