@@ -68,13 +68,17 @@ Masking needs a child whose stdout and stderr are pipes.
   - `signal.Notify` is called on a buffered channel before the child starts, so a signal in between is not lost
   - Errors from forwarding to a child that has already exited are ignored
   - SIGTSTP and SIGCONT are not forwarded; the terminal sends them to the whole process group
+  - A signal that was ignored when cred started (e.g. SIGHUP under `nohup`, SIGINT for a background job of a script) is not caught or forwarded, so the child inherits it as ignored, as it did with `syscall.Exec`
+    - `signal.Notify` would install a handler for it, and the child would get the default action instead
+  - After the child exits, cred stops catching these signals, so they act on cred itself
 - On Ctrl-C in a terminal, the child receives SIGINT twice: from the terminal and from cred. `op run` behaves the same. `--no-masking` keeps the old behavior
 - If cred itself is killed with SIGKILL, the child is not signalled. It ends on stdin EOF or on its next write to the closed pipe. This is accepted
 
 ### Waiting and exit code
 
 - cred waits for the child to exit, not for the pipes to reach EOF
-  - After the child exits, cred keeps reading for up to 1 second, then stops, so a background process that inherited the pipes cannot keep cred alive
+  - After the child exits, cred keeps reading until the pipes have been silent for 1 second, so a background process that inherited the pipes cannot keep cred alive
+    - The timeout is renewed before each read, so time spent blocked on a slow reader of cred's own output does not count and buffered output is not dropped
   - Each stream's held-back tail is then written
 - cred exits with the child's exit code
 - If the child is killed by a signal, cred exits with 128 + the signal number (the shell convention)

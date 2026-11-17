@@ -250,7 +250,9 @@ By default, `cred run` replaces secrets in the command's stdout and stderr with 
   - stdin is still passed as is
   - When nothing needs masking (`--no-masking`, or no value of 8 bytes or more), `cred run` replaces itself with the command as before
 - Signals (`SIGINT`, `SIGTERM`, `SIGHUP`, `SIGQUIT`, `SIGUSR1`, `SIGUSR2`, `SIGWINCH`) are forwarded to the command
+  - A signal that was ignored when `cred run` started, such as `SIGHUP` under `nohup`, stays ignored for the command
   - `cred run` exits with the command's exit code, or 128 + n if the command was killed by signal n
+  - After the command exits, `cred run` writes the remaining output and stops once the pipes have been silent for 1 second, so a background process that inherited them does not keep it running
   - On Ctrl-C in a terminal, the command receives `SIGINT` both from the terminal and from `cred run`
 - Masking prevents accidental disclosure; it is not a security boundary
   - A command can still reveal a secret, e.g. by encoding it or writing it to a file
