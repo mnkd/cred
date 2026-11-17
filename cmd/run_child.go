@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -23,9 +24,9 @@ var forwardedSignals = []os.Signal{
 	syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGWINCH,
 }
 
-// drainTimeout bounds how long output is still read after the command exits.
-// Waiting for EOF instead would let a background process that inherited the
-// pipes keep cred running, and cred ignores SIGTERM while it forwards it.
+// drainTimeout is how long the pipes may stay silent after the command exits
+// before cred stops reading. Waiting for EOF instead would let a background
+// process that inherited the pipes keep cred running.
 const drainTimeout = time.Second
 
 // childIO is the stdio cred hands to the command. Stdin is passed as is;
@@ -39,8 +40,20 @@ type childIO struct {
 // by signal n).
 func runMasked(binary string, args, environ, secrets []string, stdio childIO) (int, error) {
 	// Before Start, so a signal that arrives in between is not lost.
+	// A signal ignored when cred started (nohup, a background job of a
+	// script) is left alone, so the command inherits it as ignored; Notify
+	// would install a handler and the command would get the default action.
 	sigs := make(chan os.Signal, 16)
-	signal.Notify(sigs, forwardedSignals...)
+	var notify []os.Signal
+	for _, sig := range forwardedSignals {
+		if !signal.Ignored(sig) {
+			notify = append(notify, sig)
+		}
+	}
+	// Notify with no signals would relay every signal.
+	if len(notify) > 0 {
+		signal.Notify(sigs, notify...)
+	}
 	defer signal.Stop(sigs)
 
 	// One pipe for both streams when they go to the same file (a terminal,
@@ -81,9 +94,10 @@ func runMasked(binary string, args, environ, secrets []string, stdio childIO) (i
 		return 0, fmt.Errorf("failed to start %s: %w", args[0], err)
 	}
 
+	var exited atomic.Bool
 	var wg sync.WaitGroup
 	for i, r := range readers {
-		wg.Go(func() { copyMasked(streams[i], r, secrets) })
+		wg.Go(func() { copyMasked(streams[i], r, secrets, &exited) })
 	}
 
 	// Stdin, Stdout and Stderr are all files, so Wait returns when the
@@ -91,19 +105,23 @@ func runMasked(binary string, args, environ, secrets []string, stdio childIO) (i
 	waited := make(chan error, 1)
 	go func() { waited <- cmd.Wait() }()
 	var waitErr error
-	for exited := false; !exited; {
+	for done := false; !done; {
 		select {
 		case sig := <-sigs:
 			// Fails only when the process has already exited.
 			_ = cmd.Process.Signal(sig)
 		case waitErr = <-waited:
-			exited = true
+			done = true
 		}
 	}
 
-	deadline := time.Now().Add(drainTimeout)
+	// Nothing is left to forward to, so a signal now acts on cred itself.
+	signal.Stop(sigs)
+	exited.Store(true)
+	// Wakes a Read that started before the exit; copyMasked renews the
+	// deadline before each later Read.
 	for _, r := range readers {
-		_ = r.SetReadDeadline(deadline)
+		_ = r.SetReadDeadline(time.Now().Add(drainTimeout))
 	}
 	wg.Wait()
 
@@ -116,14 +134,20 @@ func runMasked(binary string, args, environ, secrets []string, stdio childIO) (i
 	return cmd.ProcessState.ExitCode(), nil
 }
 
-// copyMasked copies src to dst with secrets masked until src ends or its read
-// deadline passes, then writes the held-back tail. On a write error it stops
-// and closes src, so the command gets EPIPE on its next write.
-func copyMasked(dst io.Writer, src *os.File, secrets []string) {
+// copyMasked copies src to dst with secrets masked until src ends or, once
+// exited is set, src stays silent for drainTimeout. Then it writes the
+// held-back tail. On a write error it stops and closes src, so the command
+// gets EPIPE on its next write.
+func copyMasked(dst io.Writer, src *os.File, secrets []string, exited *atomic.Bool) {
 	defer src.Close()
 	mw := mask.NewWriter(dst, secrets)
 	buf := make([]byte, 32*1024)
 	for {
+		if exited.Load() {
+			// Renewed per Read, so time spent blocked on a slow reader of
+			// dst does not count and buffered output is not dropped.
+			_ = src.SetReadDeadline(time.Now().Add(drainTimeout))
+		}
 		n, err := src.Read(buf)
 		if n > 0 {
 			if _, werr := mw.Write(buf[:n]); werr != nil {

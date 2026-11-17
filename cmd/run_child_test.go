@@ -3,8 +3,13 @@
 package cmd
 
 import (
+	"fmt"
+	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -99,5 +104,45 @@ func TestRunMasked_StartError(t *testing.T) {
 		childIO{Stdout: tempFile(t, "out"), Stderr: tempFile(t, "err")})
 	if err == nil {
 		t.Fatal("want an error")
+	}
+}
+
+func TestRunMasked_SlowReaderGetsAllOutput(t *testing.T) {
+	// The output fits in the pipe buffers, so the command exits while cred
+	// is still blocked writing to a reader that starts late. Nothing may be
+	// dropped because of that.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	got := make(chan string, 1)
+	go func() {
+		time.Sleep(2 * drainTimeout)
+		b, _ := io.ReadAll(r)
+		got <- string(b)
+	}()
+
+	code := runSh(t, `head -c 70000 /dev/zero | tr '\0' x; echo; echo LAST-LINE`, w, tempFile(t, "err"))
+	w.Close()
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0", code)
+	}
+	out := <-got
+	if !strings.HasSuffix(out, "\nLAST-LINE\n") || len(out) != 70000+1+len("LAST-LINE\n") {
+		t.Errorf("got %d bytes ending %q; output was dropped", len(out), out[max(0, len(out)-20):])
+	}
+}
+
+func TestRunMasked_KeepsIgnoredSignalsIgnored(t *testing.T) {
+	// Under nohup, or as a background job of a script, cred starts with
+	// SIGHUP or SIGINT ignored. The command must inherit that.
+	for _, sig := range []syscall.Signal{syscall.SIGHUP, syscall.SIGINT} {
+		signal.Ignore(sig)
+		code := runSh(t, fmt.Sprintf(`kill -%d $$; echo survived`, int(sig)), tempFile(t, "out"), tempFile(t, "err"))
+		signal.Reset(sig)
+		if code != 0 {
+			t.Errorf("%v: exit code = %d, want 0 (the command should ignore it)", sig, code)
+		}
 	}
 }
