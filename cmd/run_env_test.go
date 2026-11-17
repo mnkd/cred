@@ -64,7 +64,7 @@ func TestBuildRunEnv_ReferenceOnlySkipsNamespaceInjection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m := envMap(got)
+	m := envMap(got.Environ)
 	if m["API_TOKEN"] != "jira-secret" {
 		t.Errorf("API_TOKEN = %q, want jira-secret", m["API_TOKEN"])
 	}
@@ -84,7 +84,7 @@ func TestBuildRunEnv_NoReferencesInjectsNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if envMap(got)["OTHER"] != "other-secret" {
+	if envMap(got.Environ)["OTHER"] != "other-secret" {
 		t.Error("namespace should be injected when there are no references (backward compatible)")
 	}
 }
@@ -101,7 +101,7 @@ func TestBuildRunEnv_EnvFileSkipsNamespaceInjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := envMap(got)
+	m := envMap(got.Environ)
 	if _, ok := m["OTHER"]; ok {
 		t.Error("namespace must not be injected when --env-file is used without -n")
 	}
@@ -125,7 +125,7 @@ func TestBuildRunEnv_ExplicitNamespaceWithReferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := envMap(got)
+	m := envMap(got.Environ)
 	if m["A"] != "ref-a" || m["NS_ONLY"] != "ns-only" {
 		t.Errorf("got A=%q NS_ONLY=%q", m["A"], m["NS_ONLY"])
 	}
@@ -149,7 +149,7 @@ func TestBuildRunEnv_Precedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := envMap(got)
+	m := envMap(got.Environ)
 	// env-file beats namespace injection, and its reference is resolved afterwards
 	if m["SHARED"] != "from-env-file-ref" {
 		t.Errorf("SHARED = %q, want from-env-file-ref", m["SHARED"])
@@ -177,8 +177,8 @@ func TestBuildRunEnv_NamespaceOverridesInheritedReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if envMap(got)["TOKEN"] != "ns-value" {
-		t.Errorf("TOKEN = %q, want ns-value", envMap(got)["TOKEN"])
+	if envMap(got.Environ)["TOKEN"] != "ns-value" {
+		t.Errorf("TOKEN = %q, want ns-value", envMap(got.Environ)["TOKEN"])
 	}
 	if calls["cred:missing/TOKEN"] != 0 {
 		t.Error("overwritten reference should not be resolved")
@@ -194,7 +194,7 @@ func TestBuildRunEnv_ResolvesOnceAndCaches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := envMap(got)
+	m := envMap(got.Environ)
 	if m["A"] != "cred://work/OTHER" || m["B"] != "cred://work/OTHER" {
 		t.Errorf("resolved values must not be resolved again: A=%q B=%q", m["A"], m["B"])
 	}
@@ -308,8 +308,64 @@ func TestBuildRunEnv_ServiceNameLikeValuePassesThrough(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := envMap(got)
+	m := envMap(got.Environ)
 	if m["CRED_SERVICE"] != "cred:work" || m["NS_ONLY"] != "ns-only" {
 		t.Errorf("got CRED_SERVICE=%q NS_ONLY=%q", m["CRED_SERVICE"], m["NS_ONLY"])
+	}
+}
+
+func TestBuildRunEnv_ReturnsKeychainValuesAsSecrets(t *testing.T) {
+	stubSecrets(t, map[string]string{
+		"cred:default/NS_KEY": "namespace-secret",
+		"cred:work/REF_KEY":   "reference-secret",
+		"cred:work/FILE_KEY":  "file-reference-secret",
+	})
+	envFile := writeEnvFile(t, "FILE_REF=cred://work/FILE_KEY\nPLAIN=plain-file-value\n")
+
+	got, err := buildRunEnv(runEnvInput{
+		Environ:           []string{"REF=cred://work/REF_KEY", "INHERITED=inherited-value"},
+		Namespace:         "default",
+		NamespaceKeys:     []string{"NS_KEY"},
+		NamespaceExplicit: true,
+		EnvFiles:          []string{envFile},
+	}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secrets := map[string]bool{}
+	for _, s := range got.Secrets {
+		secrets[s] = true
+	}
+	for _, want := range []string{"namespace-secret", "reference-secret", "file-reference-secret"} {
+		if !secrets[want] {
+			t.Errorf("Secrets should contain %q, got %q", want, got.Secrets)
+		}
+	}
+	for _, notWant := range []string{"plain-file-value", "inherited-value"} {
+		if secrets[notWant] {
+			t.Errorf("Secrets must not contain %q", notWant)
+		}
+	}
+}
+
+func TestBuildRunEnv_OverriddenNamespaceValueIsStillSecret(t *testing.T) {
+	// A namespace value replaced by --env-file was still read from the
+	// keychain; masking it costs nothing and avoids reasoning about which
+	// value the command finally sees.
+	stubSecrets(t, map[string]string{"cred:default/TOKEN": "namespace-secret"})
+	envFile := writeEnvFile(t, "TOKEN=file-value\n")
+
+	got, err := buildRunEnv(runEnvInput{
+		Namespace:         "default",
+		NamespaceKeys:     []string{"TOKEN"},
+		NamespaceExplicit: true,
+		EnvFiles:          []string{envFile},
+	}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Secrets) != 1 || got.Secrets[0] != "namespace-secret" {
+		t.Errorf("Secrets = %q, want [namespace-secret]", got.Secrets)
 	}
 }

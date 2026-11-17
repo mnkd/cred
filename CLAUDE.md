@@ -16,6 +16,7 @@ make install     # go install .
 - `internal/keyring/` — timeout wrapper for zalando/go-keyring
 - `internal/config/` — read/write ~/.config/cred/config.yml
 - `internal/env/` — .env file parser
+- `internal/mask/` — streaming replacement of secrets in `cred run` output
 
 ## Coding Rules
 
