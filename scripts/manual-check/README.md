@@ -79,5 +79,7 @@ scripts/manual-check/cleanup.sh
 - The server does not connect
   - Look at the server's stderr in the client's MCP log
   - `→ Resolved 1 reference(s)` means cred resolved the dummy value
+- `/usr/bin/python3` asks to install the command line developer tools
+  - Install them with `xcode-select --install`, or install Xcode
 - `Error: failed to load config: ... $HOME is not defined`
   - The client did not pass `HOME`. Add `HOME` to the server's `env` to narrow it down

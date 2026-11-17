@@ -27,7 +27,7 @@ Add the kit under `scripts/manual-check/`, without machine-specific paths.
 - `cleanup.sh` — removes the dummy keychain value and the cache directory, and prints the commands to unregister the MCP server
 - `README.md` — the procedure and the expected results
 
-Python is used for the server because `/usr/bin/python3` is available on macOS with the Command Line Tools, which Go development on macOS already needs. A Go server under `cmd/` would add a binary that only this manual check uses.
+Python is used for the server because `/usr/bin/python3` comes with the Command Line Tools or Xcode, which a macOS development machine usually has (e.g. for git). Building cred itself does not need them. Without them, `/usr/bin/python3` only offers to install them, so the README says to run `xcode-select --install`. A Go server under `cmd/` would add a binary that only this manual check uses.
 
 ## Changes
 
