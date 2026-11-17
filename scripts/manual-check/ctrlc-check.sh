@@ -4,6 +4,11 @@
 KIT="${XDG_CACHE_HOME:-$HOME/.cache}/cred-manual-check"
 export DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN
 
+if [ ! -x "$KIT/cred-dev" ]; then
+  echo "$KIT/cred-dev not found; run scripts/manual-check/setup.sh first" >&2
+  exit 1
+fi
+
 echo "== 1/2: plain command (sleep 30). Press Ctrl-C; it should stop at once."
 "$KIT/cred-dev" run -- sh -c 'echo "token=$DEMO_TOKEN"; echo "press Ctrl-C"; exec sleep 30'
 echo "-> exit code $? (expect 130)"

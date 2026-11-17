@@ -21,7 +21,7 @@ cat <<MSG
 
 Register the MCP server:
 
-  claude mcp add cred-manual-check -s user -e DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- $KIT/cred-dev run -- /usr/bin/python3 $KIT/mcp_echo_server.py
+  claude mcp add cred-manual-check -s user -e DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- '$KIT/cred-dev' run -- /usr/bin/python3 '$KIT/mcp_echo_server.py'
 
-  codex mcp add cred-manual-check --env DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- $KIT/cred-dev run -- /usr/bin/python3 $KIT/mcp_echo_server.py
+  codex mcp add cred-manual-check --env DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- '$KIT/cred-dev' run -- /usr/bin/python3 '$KIT/mcp_echo_server.py'
 MSG
