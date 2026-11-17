@@ -10,10 +10,10 @@ The injected value is a dummy, not a secret.
 ## Files
 
 - `setup.sh`
-  - Builds cred from this checkout into `~/.cache/cred-manual-check/cred-dev` (`$XDG_CACHE_HOME` if set) and copies the MCP server there
+  - Builds cred and the MCP server from this checkout into `~/.cache/cred-manual-check/` (`$XDG_CACHE_HOME` if set)
   - Stores the dummy value for `cred://cred-manual-check/DEMO_TOKEN` in the keychain
   - Prints the commands to register the MCP server
-- `mcp_echo_server.py` — a minimal stdio MCP server
+- `mcpserver/` — a minimal stdio MCP server
   - `ping_cred` returns `pong from cred-manual-check`
   - `show_token` returns `DEMO_TOKEN=<concealed by cred>` when masking works
   - It writes `DEMO_TOKEN` to stderr at start, so the client's MCP log shows whether stderr is masked
@@ -79,7 +79,5 @@ scripts/manual-check/cleanup.sh
 - The server does not connect
   - Look at the server's stderr in the client's MCP log
   - `→ Resolved 1 reference(s)` means cred resolved the dummy value
-- `/usr/bin/python3` asks to install the command line developer tools
-  - Install them with `xcode-select --install`, or install Xcode
 - `Error: failed to load config: ... $HOME is not defined`
   - The client did not pass `HOME`. Add `HOME` to the server's `env` to narrow it down

@@ -1,16 +1,16 @@
 #!/bin/sh
 # Prepares the manual check of cred run (see README.md in this directory).
-# Builds cred from this checkout into a cache directory, so the path that
-# MCP clients keep does not point into a worktree that may be deleted.
+# Builds cred and the MCP server from this checkout into a cache directory,
+# so the paths that MCP clients keep do not point into a worktree that may
+# be deleted.
 set -e
 SRC="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SRC/../.." && pwd)"
 KIT="${XDG_CACHE_HOME:-$HOME/.cache}/cred-manual-check"
 
 mkdir -p "$KIT"
-(cd "$ROOT" && go build -o "$KIT/cred-dev" .)
-cp "$SRC/mcp_echo_server.py" "$KIT/"
-echo "built $KIT/cred-dev"
+(cd "$ROOT" && go build -o "$KIT/cred-dev" . && go build -o "$KIT/mcpserver" ./scripts/manual-check/mcpserver)
+echo "built $KIT/cred-dev and $KIT/mcpserver"
 
 # A dummy value, not a secret. References read the keychain directly, so
 # ~/.config/cred/config.yml is not changed.
@@ -21,7 +21,7 @@ cat <<MSG
 
 Register the MCP server:
 
-  claude mcp add cred-manual-check -s user -e DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- '$KIT/cred-dev' run -- /usr/bin/python3 '$KIT/mcp_echo_server.py'
+  claude mcp add cred-manual-check -s user -e DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- '$KIT/cred-dev' run -- '$KIT/mcpserver'
 
-  codex mcp add cred-manual-check --env DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- '$KIT/cred-dev' run -- /usr/bin/python3 '$KIT/mcp_echo_server.py'
+  codex mcp add cred-manual-check --env DEMO_TOKEN=cred://cred-manual-check/DEMO_TOKEN -- '$KIT/cred-dev' run -- '$KIT/mcpserver'
 MSG
