@@ -10,6 +10,7 @@ Inspired by the credential management architecture of GitHub CLI (`gh`).
 - **Namespace organization**: Group credentials by project or environment
 - **Env injection**: Automatically inject as environment variables with `cred run -- python app.py`
 - **References**: Keep only `cred://<namespace>/<KEY>` in MCP server configs and dotenv files; `cred run` resolves them at launch
+- **Output masking**: `cred run` replaces injected secrets in the command's output with `<concealed by cred>`, like `op run`
 - **.env import**: Bulk migrate from existing `.env` files
 
 ## Installation
@@ -155,14 +156,18 @@ cred run -- node server.js
 # Inject from a specific namespace
 cred run -n work -- ./run-local.sh
 
-# Verify injected environment variables
+# Verify injected environment variables (the value is shown as <concealed by cred>)
 cred run -- env | grep OPENAI
+# OPENAI_API_KEY=<concealed by cred>
 
 # Pass to Docker
 cred run -- docker run --env OPENAI_API_KEY app:latest
 
-# Run multiple commands via shell
+# Run multiple commands via shell (the echo prints key=<concealed by cred>)
 cred run -- sh -c 'echo "key=$OPENAI_API_KEY" && python app.py'
+
+# Turn off masking, e.g. for an interactive command that needs a terminal
+cred run --no-masking -- ./interactive-tool
 ```
 
 #### `cred://` references
@@ -223,7 +228,34 @@ If any reference cannot be resolved, the command is not started and `cred` exits
 
 #### Output
 
-All `cred` messages go to stderr. stdout belongs to the command, so `cred run` can wrap MCP stdio servers that speak JSON-RPC over stdout. The command's output is not modified (secrets are not masked).
+All `cred` messages go to stderr. stdout belongs to the command, so `cred run` can wrap MCP stdio servers that speak JSON-RPC over stdout.
+
+#### Masking
+
+By default, `cred run` replaces secrets in the command's stdout and stderr with `<concealed by cred>`, so a command that prints them (`env`, `curl -v`, `set -x`, ...) does not leave them in logs or in an AI agent's conversation history. `--no-masking` turns this off.
+
+- Masked values are the values `cred run` read from the keyring
+  - Values injected from a namespace
+  - Values of resolved `cred://` references
+  - Plain values in `--env-file` are not masked
+- Matching is on the exact bytes of a value
+  - Encoded forms (base64, URL encoding, JSON escaping, ...) are not masked
+  - Values shorter than 8 bytes are not masked, so that unrelated output is not corrupted
+- Output is passed on as soon as it is read
+  - Only a tail that could be the start of a secret is held back until the next output, so that a secret split across two reads is still masked
+  - A line that ends with a newline is not delayed, unless a secret contains a newline
+  - A prompt that does not end with a newline may be held back; use `--no-masking` for interactive commands
+- The command's stdout and stderr become pipes instead of a terminal
+  - Some commands drop colors or interactive output. Use `--no-masking` for them
+  - stdin is still passed as is
+  - When nothing needs masking (`--no-masking`, or no value of 8 bytes or more), `cred run` replaces itself with the command as before
+- Signals (`SIGINT`, `SIGTERM`, `SIGHUP`, `SIGQUIT`, `SIGUSR1`, `SIGUSR2`, `SIGWINCH`) are forwarded to the command
+  - `cred run` exits with the command's exit code, or 128 + n if the command was killed by signal n
+  - On Ctrl-C in a terminal, the command receives `SIGINT` both from the terminal and from `cred run`
+- Masking prevents accidental disclosure; it is not a security boundary
+  - A command can still reveal a secret, e.g. by encoding it or writing it to a file
+  - Secrets that reach the command another way, such as `export $(cred get ...)` in a shell profile, are not masked
+- With MCP servers, a tool that returns an injected secret returns `<concealed by cred>` instead. The replacement contains no characters that need escaping in JSON
 
 #### MCP server configuration
 
@@ -377,8 +409,11 @@ go build -o testcred ./cmd/testcred
 TEST_VAR=hello ./testcred TEST_VAR
 # TEST_VAR=hello
 
-# Verify cred run injects credentials
+# Verify cred run injects credentials (values are shown as <concealed by cred>)
 cred run -- ./testcred OPENAI_API_KEY ANTHROPIC_API_KEY
+
+# Show the values themselves
+cred run --no-masking -- ./testcred OPENAI_API_KEY
 
 # Verify a specific namespace
 cred run -n work -- ./testcred AWS_ACCESS_KEY_ID
@@ -399,6 +434,8 @@ cred
 │   ├── delete.go                 # cred delete
 │   ├── list.go                   # cred list
 │   ├── run.go                    # cred run -- COMMAND
+│   ├── run_child.go              # cred run: child process with masked output
+│   ├── exit.go                   # Exit code passed from the command to main
 │   ├── import.go                 # cred import .env
 │   ├── doctor.go                 # cred doctor
 │   ├── namespace.go              # cred ns {list,create,default,delete}
@@ -413,6 +450,8 @@ cred
     │   └── config.go             # YAML config file management
     ├── env/
     │   └── env.go                # .env file parser (import, run --env-file)
+    ├── mask/
+    │   └── mask.go               # Streaming secret masking (cred run output)
     └── ref/
         └── ref.go                # cred:// reference parser
 ```
@@ -433,6 +472,7 @@ secret:  "{actual_value}"      (e.g., "sk-xxxxxxxxxxxx")
 | Key design | `gh:{hostname}` + `{username}` | `cred:{namespace}` + `{key_name}` |
 | Purpose | GitHub tokens only | General-purpose (any API key) |
 | Env injection | N/A | `cred run` |
+| Output masking | N/A | `cred run` (on by default) |
 | .env import | N/A | `cred import` |
 
 ## Dependencies
